@@ -1,0 +1,30 @@
+#!/usr/bin/env perl
+
+use 5.022;
+use strict;
+use warnings;
+use utf8;
+
+use App::ArduinoBuilder;
+
+our $VERSION = $App::ArduinoBuilder::VERSION;
+
+App::ArduinoBuilder::Run();
+exit 0;
+
+# PODNAME: arduino_builder
+# ABSTRACT: Build system for Arduino programs
+
+__DATA__
+
+=pod
+
+=head1 NAME
+
+arduino_builder - Build system for Arduino programs
+
+=head1 SYNOPSIS
+
+  arduino_builder ...
+
+=cut
