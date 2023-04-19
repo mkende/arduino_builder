@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use utf8;
 
+use open ':std', ':encoding(UTF-8)';
+
 use App::ArduinoBuilder;
 
 our $VERSION = $App::ArduinoBuilder::VERSION;
