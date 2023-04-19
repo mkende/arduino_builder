@@ -19,7 +19,7 @@ for (1..10) {
 
 my $dir_with_versions = "${FindBin::Bin}/data/dir_with_versions";
 my $dir_without_versions = "${FindBin::Bin}/data/dir_without_versions";
-is (App::ArduinoBuilder::FilePath::find_latest_revision($dir_with_versions), catdir($dir_with_versions, '1.20'));
-is (App::ArduinoBuilder::FilePath::find_latest_revision($dir_without_versions), $dir_without_versions);
+is (App::ArduinoBuilder::FilePath::find_latest_revision_dir($dir_with_versions), catdir($dir_with_versions, '1.20'));
+is (App::ArduinoBuilder::FilePath::find_latest_revision_dir($dir_without_versions), $dir_without_versions);
 
 done_testing;

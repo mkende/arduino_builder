@@ -8,7 +8,7 @@ use Exporter 'import';
 use File::Spec::Functions;
 use List::Util 'min';
 
-our @EXPORT_OK = qw(find_latest_revision);
+our @EXPORT_OK = qw(find_latest_revision_dir);
 
 sub _compare_version_string {
   my @la = split /\./, $a;
@@ -27,7 +27,7 @@ sub  _pick_highest_version_string {
 # find_latest_revision('/path/to/dir') --> '/path/to/dir/9.8.2'
 # Returns the input if there are no sub-directories looking like revisions in
 # the given directory.
-sub find_latest_revision {
+sub find_latest_revision_dir {
   my ($dir) = @_;
   opendir my $dh, $dir or die "Can’t open dir '$dir': $!\n";
   my @revs_dir = grep { -d catdir($dir, $_) && m/^\d+(?:\.\d+)?/ } readdir($dh);
