@@ -22,6 +22,12 @@ is(ref $config, 'App::ArduinoBuilder::Config');
 ok($config->read_file($simple_config_path));
 ok($config->resolve());
 is($config->dump(), $simple_config_resolved);
+is($config->filter('test')->dump(), <<~EOF);
+  last=tada and this is a value and more!
+  other=this is a value and more
+  value=this is a value
+  EOF
+
 
 is(App::ArduinoBuilder::Config->new(files=>[$simple_config_path], resolve => 1)->dump(), $simple_config_resolved);
 

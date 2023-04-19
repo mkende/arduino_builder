@@ -48,8 +48,28 @@ sub resolve {
   my $config = $this->{config};
   for my $k (keys %$config) {
     _resolve_key($k, $config);
+    # It is debattable how we want to treat cygwin and msys. For now we assume
+    # that they will be used with a windows native Arduino toolchain.
+    if (($^O eq 'MSWin32' || $^O eq 'cygwin' || $^O eq 'msys') && $k =~ m/^(.*)\.windows$/) {
+      $config->{$1} = $config->{$k};
+    } elsif ($^O eq 'MacOS' && $k =~ m/^(.*)\.macosx$/) {
+      $config->{$1} = $config->{$k};
+    } elsif ($k =~ m/^(.*)\.linux$/) {
+      $config->{$1} = $config->{$k};
+    }
   }
   return 1;
+}
+
+sub filter {
+  my ($this, $prefix) = @_;
+  my $filtered = App::ArduinoBuilder::Config->new();
+  while (my ($k, $v) = each %{$this->{config}}) {
+    if ($k =~ m/^\Q$prefix\E\./) {
+      $filtered->{config}{substr($k, $+[0])} = $v;
+    }
+  }
+  return $filtered;
 }
 
 sub dump {
