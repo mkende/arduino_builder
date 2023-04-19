@@ -10,10 +10,11 @@ use utf8;
 sub new {
   my ($class, %options) = @_;
   my $me = bless {}, $class;
+  $me->read_file($options{file}) if $options{file};
   for my $f (@{$options{files}}) {
     $me->read_file($f);
   }
-  $me->resolve() if $options{resolve};
+  $me->resolve(%options) if $options{resolve};
   return $me;
 }
 
@@ -30,24 +31,27 @@ sub read_file {
 }
 
 sub _resolve_key {
-  my ($key, $config) = @_;
+  my ($key, $config, %options) = @_;
   my $value = \$config->{$key};
-  while ($$value =~ m/\{([^}]+)\}/) {
-    my $match_start = $-[0];
-    my $match_len = $+[0] - $-[0];
+  while ($$value =~ m/\{([^}]+)\}/g) {
     my $new_key = $1;
-    my $l = 2 + length($new_key);
-    my $new_value = _resolve_key($new_key, $config);
-    substr $$value, $match_start, $match_len, $new_value;
+    if (exists $config->{$new_key}) {
+      my $match_start = $-[0];
+      my $match_len = $+[0] - $-[0];
+      my $l = 2 + length($new_key);
+      my $new_value = _resolve_key($new_key, $config, %options);
+      substr $$value, $match_start, $match_len, $new_value;
+    } elsif (!$options{allow_partial}) {
+      die "Can’t resolve key '${new_key}' in the configuration.\n";
+    }
   }
   return $$value;
 }
 
 sub resolve {
-  my ($this) = @_;
+  my ($this, %options) = @_;
   my $config = $this->{config};
   for my $k (keys %$config) {
-    _resolve_key($k, $config);
     # It is debattable how we want to treat cygwin and msys. For now we assume
     # that they will be used with a windows native Arduino toolchain.
     if (($^O eq 'MSWin32' || $^O eq 'cygwin' || $^O eq 'msys') && $k =~ m/^(.*)\.windows$/) {
@@ -57,6 +61,9 @@ sub resolve {
     } elsif ($k =~ m/^(.*)\.linux$/) {
       $config->{$1} = $config->{$k};
     }
+  }
+  for my $k (keys %$config) {
+    _resolve_key($k, $config, %options);
   }
   return 1;
 }
