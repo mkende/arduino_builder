@@ -82,7 +82,7 @@ sub append {
 sub _resolve_key {
   my ($key, $config, %options) = @_;
   return $options{with}{$key} if exists $options{with}{$key};
-  return $options{base}->get($key, %options{grep { $_ ne 'base'} keys %options}) if exists $options{base} && $options{base}->exists($key);
+  return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base} && $options{base}->exists($key);
   if (not exists $config->{$key}) {
     die "Can’t resolve key '${key}' in the configuration.\n" unless $options{allow_partial};
     return;
