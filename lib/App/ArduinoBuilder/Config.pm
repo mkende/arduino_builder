@@ -13,7 +13,7 @@ our @EXPORT_OK = qw(get_os_name);
 
 sub new {
   my ($class, %options) = @_;
-  my $me = bless {}, $class;
+  my $me = bless {config => {}}, $class;
   $me->read_file($options{file}) if $options{file};
   for my $f (@{$options{files}}) {
     $me->read_file($f, %options);
@@ -45,35 +45,61 @@ sub empty {
 
 sub get {
   my ($this, $key, %options) = @_;
-  my $v = $this->{config}{$key};
+  $options{allow_partial} = 1 if $options{no_resolve};
+  my $v = _resolve_key($key, $this->{config}, %options, allow_partial => 1);
+  return $options{default} if !defined $v && exists $options{default};
   die "Key '$key' does not exist in the configuration.\n" unless defined $v;
   die "Key '$key' has unresolved reference to value '$1'.\n" if $v =~ m/\{([^}]+)\}/ && !$options{allow_partial};
   return $v;
 }
 
+sub keys {
+  my ($this, %options) = @_;
+  return keys %{$this->{config}};
+}
+
+sub exists {
+  my ($this, $key) = @_;
+  return exists $this->{config}{$key};
+}
+
 sub set {
   my ($this, $key, $value, %options) = @_;
-  die "Key '$key' already exists.\n" if exists $this->{config}{$key} && !$options{allow_override};
+  if (exists $this->{config}{$key}) {
+    return if $options{ignore_existing};
+    die "Key '$key' already exists.\n" unless $options{allow_override};
+  }
   $this->{config}{$key} = $value;
+  return;
+}
+
+sub append {
+  my ($this, $key, $value) = @_;
+  $this->{config}{$key} .= ($this->{config}{$key} ? ' ' : '').$value;
   return;
 }
 
 sub _resolve_key {
   my ($key, $config, %options) = @_;
-  my $value = \$config->{$key};
-  while ($$value =~ m/\{([^{}}]+)\}/g) {
-    my $new_key = $1;
-    if (exists $config->{$new_key}) {
-      my $match_start = $-[0];
-      my $match_len = $+[0] - $-[0];
-      my $l = 2 + length($new_key);
-      my $new_value = _resolve_key($new_key, $config, %options);
-      substr $$value, $match_start, $match_len, $new_value;
-    } elsif (!$options{allow_partial}) {
-      die "Can’t resolve key '${new_key}' in the configuration.\n";
-    }
+  return $options{with}{$key} if exists $options{with}{$key};
+  return $options{base}->get($key, %options{grep { $_ ne 'base'} keys %options}) if exists $options{base} && $options{base}->exists($key);
+  if (not exists $config->{$key}) {
+    die "Can’t resolve key '${key}' in the configuration.\n" unless $options{allow_partial};
+    return;
   }
-  return $$value;
+  my $value = $config->{$key};
+  return $value if $options{no_resolve};
+  while ($value =~ m/\{([^{}}]+)\}/g) {
+    my $new_key = $1;
+    my $match_start = $-[0];
+    my $match_len = $+[0] - $-[0];
+    my $l = 2 + length($new_key);
+    my $new_value = _resolve_key($new_key, $config, %options);
+    substr $value, $match_start, $match_len, $new_value if defined $new_value;
+  }
+  # We don’t materialize the resolved value if we’re using temporary values.
+  $config->{$key} = $value unless $options{with};
+  return $value;
 }
 
 # The Arduino OS name, based on the Perl OS name.
@@ -87,12 +113,13 @@ sub get_os_name {
 
 sub resolve {
   my ($this, %options) = @_;
+  $options{allow_partial} = 1 if $options{no_resolve};
   my $config = $this->{config};
   my $os_name = $options{force_os_name} // get_os_name();
-  for my $k (keys %$config) {
+  for my $k (CORE::keys %$config) {
     $config->{$1} = $config->{$k} if $k =~ m/^(.*)\.$os_name$/;
   }
-  for my $k (keys %$config) {
+  for my $k (CORE::keys %$config) {
     _resolve_key($k, $config, %options);
   }
   return 1;
@@ -122,7 +149,7 @@ sub dump {
   my $c = $this->{config};
   my $out = '';
   my $p = $prefix // '';
-  for my $k (sort(keys %$c)) {
+  for my $k (sort(CORE::keys %$c)) {
     my $v = $c->{$k};
     $out .= "${p}${k}=${v}\n";
   }

@@ -5,16 +5,18 @@ use warnings;
 use utf8;
 
 use Exporter 'import';
-use File::Spec::Functions;
-use List::Util 'min';
+use File::Find;
+use File::Spec::Functions 'catdir', 'rel2abs';
+use List::Util 'min', 'any';
 
-our @EXPORT_OK = qw(find_latest_revision_dir);
+our @EXPORT_OK = qw(find_latest_revision_dir list_sub_directories find_all_files_with_extensions);
 
 sub _compare_version_string {
-  my @la = split /\./, $a;
-  my @lb = split /\./, $b;
+  my @la = split /\.|-/, $a;
+  my @lb = split /\.|-/, $b;
   for my $i (0..min($#la, $#lb)) {
-    my $c = $la[$i] <=> $lb[$i];
+    # Let’s try to handle things like: 1.5.0-b
+    my $c = $la[$i] <=> $lb[$i] || $la[$i] cmp $lb[$i];
     return $c if $c;
   }
   return $#la <=> $#lb;
@@ -30,8 +32,30 @@ sub  _pick_highest_version_string {
 sub find_latest_revision_dir {
   my ($dir) = @_;
   opendir my $dh, $dir or die "Can’t open dir '$dir': $!\n";
-  my @revs_dir = grep { -d catdir($dir, $_) && m/^\d+(?:\.\d+)?/ } readdir($dh);
+  my @revs_dir = grep { -d catdir($dir, $_) && m/^\d+(?:\.\d+)?(?:-.*)?/ } readdir($dh);
   closedir $dh;
   return $dir unless @revs_dir;
   return catdir($dir, _pick_highest_version_string(@revs_dir));
+}
+
+sub list_sub_directories {
+  my ($dir) = @_;
+  opendir my $dh, $dir or die "Can’t open dir '$dir': $!\n";
+  my @sub_dirs = grep { -d catdir($dir, $_) && ! m/^\./ } readdir($dh);
+  closedir $dh;
+  return @sub_dirs;
+}
+
+sub find_all_files_with_extensions {
+  my ($dir, $exts, $excluded_dirs) = @_;
+  my $exts_re = join('|', @{$exts});
+  my @excluded_dirs = map { rel2abs($_) } @{$excluded_dirs // []};
+  my @found;
+  find(sub { push @found, $File::Find::name if -f && m/\.(?:$exts_re)$/;
+             if (-d) {
+               my $a = rel2abs($_);
+               $File::Find::prune = any { $_ eq $a } @excluded_dirs;
+             }
+           }, $dir);
+  return @found;
 }
