@@ -31,7 +31,8 @@ sub _run_recipe_pattern {
   my ($this, $recipe_name, %options) = @_;
   my $recipes = $this->{config}->filter("recipe.${recipe_name}");
   for my $k (sort $recipes->keys()) {
-    die "Invalid recipe name: recipe.${recipe_name}.${k}\n" unless $k =~ m/^(?:\d+\.)?pattern$/;
+    die "Invalid recipe name: recipe.${recipe_name}.${k}\n" unless $k =~ m/^(?:\d+\.)?pattern$/ || $options{is_objcopy};
+    die "Invalid objcopy recipe name: recipe.${recipe_name}.${k}\n" if $options{is_objcopy} && $k !~ m/^\w+\.(?:\d+\.)?pattern$/;
     _execute($recipes->get($k, base => $this->{config}, %options));
   }
   return;
@@ -135,4 +136,9 @@ sub run_hook {
   my ($this, $hook_name) = @_;
   $this->_run_recipe_pattern("hooks.${hook_name}");
   return;
+}
+
+sub objcopy {
+  my ($this) = @_;
+  $this->_run_recipe_pattern('objcopy', is_objcopy => 1);
 }

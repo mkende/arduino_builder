@@ -116,24 +116,28 @@ sub Run {
 
   my $builder = App::ArduinoBuilder::Builder->new($config);
 
-  #$builder->run_hook('prebuild', $config);
+  #$builder->run_hook('prebuild');
 
   $config->append('includes', '"-I'.$config->get('build.core.path').'"');
   $config->append('includes', '"-I'.$config->get('build.variant.path').'"');
-  #$builder->run_hook('core.prebuild', $config);
-  #$builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($build_dir, 'core'), 'core.a', $config);
-  #$builder->run_hook('core.postbuild', $config);
+  #$builder->run_hook('core.prebuild');
+  #$builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($build_dir, 'core'), 'core.a');
+  #$builder->run_hook('core.postbuild');
 
   $config->append('includes', '"-I'.$config->get('build.source.path').'"');
-  $builder->run_hook('sketch.prebuild', $config);
-  my @object_files = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir], $config);
-  $builder->run_hook('sketch.postbuild', $config);
+  $builder->run_hook('sketch.prebuild');
+  my @object_files = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir]);
+  $builder->run_hook('sketch.postbuild');
 
   print 'Object files: '.join(', ', @object_files)."\n";
 
-  $builder->run_hook('linking.prelink', $config);
-  $builder->link_executable(\@object_files, 'core.a', $config);
-  $builder->run_hook('linking.postlink', $config);
+  $builder->run_hook('linking.prelink');
+  $builder->link_executable(\@object_files, 'core.a');
+  $builder->run_hook('linking.postlink');
+
+  $builder->run_hook('objcopy.preobjcopy');
+  $builder->objcopy();
+  $builder->run_hook('objcopy.postobjcopy');
 }
 
 1;
