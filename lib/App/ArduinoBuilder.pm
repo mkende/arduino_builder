@@ -7,11 +7,13 @@ use utf8;
 
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
 use App::ArduinoBuilder::Config 'get_os_name';
-use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories';
+use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
+use App::ArduinoBuilder::Logger;
 
 use Cwd;
 use File::Spec::Functions;
 use Getopt::Long;
+use List::Util 'any', 'none';
 use Pod::Usage;
 
 our $VERSION = '0.01';
@@ -20,10 +22,15 @@ sub Run {
   my $project_dir;
   my $build_dir;
 
+  my (@skip, @force, @only);
   GetOptions(
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
       'project|p=s' => \$project_dir,
       'build|b=s' => \$build_dir,
+      'log_level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
+      'skip=s@' => sub { push @skip, split /,/, $_[1] },  # skip this step
+      'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
+      'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   if ($project_dir && !$build_dir) {
@@ -43,7 +50,7 @@ sub Run {
   my $package_path = $config->get('builder.package.path');
   my $hardware_path = find_latest_revision_dir(catdir($package_path, 'hardware', $config->get('builder.package.arch')));
 
-  print "Project config: \n".$config->dump('  ');
+  debug "Project config: \n%s", sub { $config->dump('  ') };
 
   my $boards_local_config_path = catfile($hardware_path, 'boards.local.txt');
   if (-f $boards_local_config_path) {
@@ -58,10 +65,10 @@ sub Run {
   if (-f $boards_config_path) {
     my $board_name = $config->get('builder.package.board');
     my $board = App::ArduinoBuilder::Config->new(file => $boards_config_path, resolve => 1, allow_partial => 1)->filter($board_name);
-    die "Board '${board_name}' not found in boards.txt.\n" if $board->empty();
+    fatal "Board '${board_name}' not found in boards.txt." if $board->empty();
     $config->merge($board);
   } else {
-    warn "Could not find boards.txt file.\n";
+    warning "Could not find boards.txt file.";
   }
 
   my $board_menu = $config->filter('menu');
@@ -95,7 +102,7 @@ sub Run {
   my $tools_dir = catdir($package_path, 'tools');
   my @tools = list_sub_directories($tools_dir);
   for my $t (@tools) {
-    print "Found tool: $t\n";
+    debug "Found tool: $t";
     my $tool_path = catdir($tools_dir, $t);
     my $latest_tool_path = find_latest_revision_dir($tool_path);
     $config->set("runtime.tools.${t}.path", $latest_tool_path);
@@ -116,28 +123,71 @@ sub Run {
 
   my $builder = App::ArduinoBuilder::Builder->new($config);
 
-  #$builder->run_hook('prebuild');
+  $builder->run_hook('prebuild');
 
   $config->append('includes', '"-I'.$config->get('build.core.path').'"');
   $config->append('includes', '"-I'.$config->get('build.variant.path').'"');
-  #$builder->run_hook('core.prebuild');
-  #$builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($build_dir, 'core'), 'core.a');
-  #$builder->run_hook('core.postbuild');
+
+  my $run_step = sub {
+    my ($step) = @_;
+    return (none { $_ eq $step } @skip) && (!@only || any { $_ eq $step } @only);
+  };
+  my $force = sub {
+    my ($step) = @_;
+    return any { $_ eq $step } @force;
+  };
+
+  my $built_something = 0;
+
+  if ($run_step->('core')) {
+    info 'Building core...';
+    $builder->run_hook('core.prebuild');
+    my $built_core = $builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($build_dir, 'core'), 'core.a', $force->('core'));
+    info ($built_core ? '  Success' : '  Already up-to-date');
+    $built_something |= $built_core;
+    $builder->run_hook('core.postbuild');
+  }
+
 
   $config->append('includes', '"-I'.$config->get('build.source.path').'"');
-  $builder->run_hook('sketch.prebuild');
-  my @object_files = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir]);
-  $builder->run_hook('sketch.postbuild');
 
-  print 'Object files: '.join(', ', @object_files)."\n";
 
-  $builder->run_hook('linking.prelink');
-  $builder->link_executable(\@object_files, 'core.a');
-  $builder->run_hook('linking.postlink');
+  if ($run_step->('sketch')) {
+    info 'Building sketch...';
+    $builder->run_hook('sketch.prebuild');
+    my $built_sketch = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir], $force->('sketch'));
+    info ($built_sketch ? '  Success' : '  Already up-to-date');
+    $built_something |= $built_sketch;
+    $builder->run_hook('sketch.postbuild');
+  }
+  # Bug: there is a similar bug to the one in build_archive: if a source file is
+  # removed, we won’t remove it’s object file. I guess we could try to detect it.
+  # Meanwhile it’s probably acceptable to ask for a cleanup from time to time.
+  my @object_files = find_all_files_with_extensions(catdir($build_dir, 'sketch'), ['o']);
+  debug 'Object files: '.join(', ', @object_files);
 
-  $builder->run_hook('objcopy.preobjcopy');
-  $builder->objcopy();
-  $builder->run_hook('objcopy.postobjcopy');
+  info 'Linking binary...';
+  if (($built_something && $run_step->('link')) || $force->('link')) {
+    $built_something = 1;
+    $builder->run_hook('linking.prelink');
+    $builder->link_executable(\@object_files, 'core.a');
+    $builder->run_hook('linking.postlink');
+    info '  Success';
+  } else {
+    info '  Already up-to-date';
+  }
+
+  info 'Extracting binary data';
+  if (($built_something && $run_step->('objcopy')) || $force->('objcopy')) {
+    $builder->run_hook('objcopy.preobjcopy');
+    $builder->objcopy();
+    $builder->run_hook('objcopy.postobjcopy');
+    info '  Success';
+  } else {
+    info '  Already up-to-date';
+  }
+
+  info 'Success!';
 }
 
 1;

@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use utf8;
 
+use App::ArduinoBuilder::Logger;
 use Exporter 'import';
 
 our @EXPORT_OK = qw(get_os_name);
@@ -24,10 +25,10 @@ sub new {
 
 sub read_file {
   my ($this, $file_name, %options) = @_;
-  open my $fh, '<', $file_name or die "Can’t open '${file_name}': $!\n";
+  open my $fh, '<', $file_name or fatal "Can’t open '${file_name}': $!";
   while (my $l = <$fh>) {
     next if $l =~ m/^\s*(?:#.*)?$/;  # Only whitespace or comment
-    die "Unparsable line in ${file_name}: ${l}\n" unless $l =~ m/^\s*([-0-9a-z_.]+?)\s*=\s*(.*?)\s*$/i;
+    fatal "Unparsable line in ${file_name}: ${l}" unless $l =~ m/^\s*([-0-9a-z_.]+?)\s*=\s*(.*?)\s*$/i;
     $this->{config}{$1} = $2 if !(exists $this->{config}{$1}) || $options{allow_override};
   }
   return 1;
@@ -48,8 +49,8 @@ sub get {
   $options{allow_partial} = 1 if $options{no_resolve};
   my $v = _resolve_key($key, $this->{config}, %options, allow_partial => 1);
   return $options{default} if !defined $v && exists $options{default};
-  die "Key '$key' does not exist in the configuration.\n" unless defined $v;
-  die "Key '$key' has unresolved reference to value '$1'.\n" if $v =~ m/\{([^}]+)\}/ && !$options{allow_partial};
+  fatal "Key '$key' does not exist in the configuration." unless defined $v;
+  fatal "Key '$key' has unresolved reference to value '$1'." if $v =~ m/\{([^}]+)\}/ && !$options{allow_partial};
   return $v;
 }
 
@@ -67,7 +68,7 @@ sub set {
   my ($this, $key, $value, %options) = @_;
   if (exists $this->{config}{$key}) {
     return if $options{ignore_existing};
-    die "Key '$key' already exists.\n" unless $options{allow_override};
+    fatal "Key '$key' already exists." unless $options{allow_override};
   }
   $this->{config}{$key} = $value;
   return;
@@ -84,7 +85,7 @@ sub _resolve_key {
   return $options{with}{$key} if exists $options{with}{$key};
   return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base} && $options{base}->exists($key);
   if (not exists $config->{$key}) {
-    die "Can’t resolve key '${key}' in the configuration.\n" unless $options{allow_partial};
+    fatal "Can’t resolve key '${key}' in the configuration." unless $options{allow_partial};
     return;
   }
   my $value = $config->{$key};

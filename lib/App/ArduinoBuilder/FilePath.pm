@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use utf8;
 
+use App::ArduinoBuilder::Logger;
 use Exporter 'import';
 use File::Find;
 use File::Spec::Functions 'catdir', 'rel2abs';
@@ -31,7 +32,7 @@ sub  _pick_highest_version_string {
 # the given directory.
 sub find_latest_revision_dir {
   my ($dir) = @_;
-  opendir my $dh, $dir or die "Can’t open dir '$dir': $!\n";
+  opendir my $dh, $dir or fatal "Can’t open dir '$dir': $!";
   my @revs_dir = grep { -d catdir($dir, $_) && m/^\d+(?:\.\d+)?(?:-.*)?/ } readdir($dh);
   closedir $dh;
   return $dir unless @revs_dir;
@@ -40,7 +41,7 @@ sub find_latest_revision_dir {
 
 sub list_sub_directories {
   my ($dir) = @_;
-  opendir my $dh, $dir or die "Can’t open dir '$dir': $!\n";
+  opendir my $dh, $dir or fatal "Can’t open dir '$dir': $!";
   my @sub_dirs = grep { -d catdir($dir, $_) && ! m/^\./ } readdir($dh);
   closedir $dh;
   return @sub_dirs;
@@ -54,8 +55,10 @@ sub find_all_files_with_extensions {
   find(sub { push @found, $File::Find::name if -f && m/\.(?:$exts_re)$/;
              if (-d) {
                my $a = rel2abs($_);
-               $File::Find::prune = any { $_ eq $a } @excluded_dirs;
+               $File::Find::prune = any { $_ eq $a || /^\./ } @excluded_dirs;
              }
            }, $dir);
   return @found;
 }
+
+1;

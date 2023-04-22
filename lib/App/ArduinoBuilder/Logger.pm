@@ -6,17 +6,19 @@ use utf8;
 
 use Exporter 'import';
 
-our @EXPORT = qw(fatal error warning info debug);
+our @EXPORT = qw(fatal error warning info debug debug_large);
 our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level set_prefix));
+our %EXPORT_TAGS = (all => [@EXPORT_OK], all_logger => [@EXPORT, 'log_cmd']);
 
 my $LEVEL_FATAL = 0;  # Fatal errors, abort the program.
 my $LEVEL_ERROR = 1;  # Recoverable errors (almost unused).
 my $LEVEL_WARN = 2;  # Warnings about possible mis-configuration.
 my $LEVEL_INFO = 3;  # Info about the main steps of the program.
-my $LEVEL_CMD = 4;  # Command lines being executed (log method not exported by default).
-my $LEVEL_DEBUG = 5;  # Any possibly lengthty debugging information.
+my $LEVEL_DEBUG = 4;  # Any possibly lengthy debugging information.
+my $LEVEL_CMD = 5;  # Command lines being executed (log method not exported by default).
+my $LEVEL_FULL_DEBUG = 6;  # Any possibly very-lengthy debugging information.
 
-my $default_level = $LEVEL_WARN;
+my $default_level = $LEVEL_INFO;
 my $current_level = $default_level;
 my $prefix = '';
 
@@ -26,7 +28,8 @@ sub _level_to_prefix {
   return 'ERROR: ' if $level == $LEVEL_ERROR;
   return 'WARNING: ' if $level == $LEVEL_WARN;
   return 'INFO: ' if $level == $LEVEL_INFO;
-  return '' if $level == $LEVEL_CMD || $level == $LEVEL_DEBUG;
+  return 'DEBUG: ' if $level == $LEVEL_DEBUG;
+  return '' if $level == $LEVEL_CMD || $level == $LEVEL_FULL_DEBUG;
   error("Unknown log level: ${level}");
   return 'UNKNOWN';
 }
@@ -48,8 +51,9 @@ sub fatal { _log($LEVEL_FATAL, @_) }
 sub error { _log($LEVEL_ERROR, @_) }
 sub warning { _log($LEVEL_WARN, @_) }
 sub info { _log($LEVEL_INFO, @_) }
-sub log_cmd { _log($LEVEL_CMD, @_) }
 sub debug { _log($LEVEL_DEBUG, @_) }
+sub log_cmd { _log($LEVEL_CMD, @_) }
+sub full_debug { _log($LEVEL_FULL_DEBUG, @_) }
 
 sub _string_to_level {
   my ($level) = @_;
@@ -57,8 +61,9 @@ sub _string_to_level {
   return $LEVEL_ERROR if $level =~ m/^ERR(?:OR)?$/i;
   return $LEVEL_WARN if $level =~ m/^WARN(:?ING)?$/i;
   return $LEVEL_INFO if $level =~ m/^INFO?$/i;
-  return $LEVEL_CMD if $level =~ m/^(?:CMD|COMMAND)S?$/i;
   return $LEVEL_DEBUG if $level =~ m/^(?:DBG|DEBUG)$/i;
+  return $LEVEL_CMD if $level =~ m/^(?:CMD|COMMAND)S?$/i;
+  return $LEVEL_FULL_DEBUG if $level =~ m/^FULL_(?:DBG|DEBUG)$/i;
   error "Unknown log level: ${level}";
   return $default_level;
 }
