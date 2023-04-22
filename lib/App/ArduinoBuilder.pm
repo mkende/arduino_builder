@@ -9,11 +9,13 @@ use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_ex
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
+use App::ArduinoBuilder::System 'find_arduino_dir';
 
 use Cwd;
+use File::Basename;
 use File::Spec::Functions;
 use Getopt::Long;
-use List::Util 'any', 'none';
+use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
 our $VERSION = '0.01';
@@ -55,6 +57,24 @@ sub Run {
     }
   }
 
+  if (!$config->exists('builder.package.path')) {
+    fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
+    my $arduino_dir = find_arduino_dir();
+    fatal "The builder.package.path config is not set and Arduino installation directory not found" unless $arduino_dir;
+    debug "Using arduino directory: ${arduino_dir}";
+    my $package_name = $config->get('builder.package.name');
+    my @tests = (catdir($arduino_dir, 'packages', $package_name), catdir($arduino_dir, 'hardware', $package_name));
+    my @dirs = grep { -d } @tests;
+    fatal "Cannot find the package directory for '${package_name}' inside Arduino directory: ${arduino_dir}" unless @dirs;
+    debug "Using package directory: ${dirs[0]}";
+    $config->set('builder.package.path' => $dirs[0]);
+  } else {
+    if ($config->exists('builder.package.name')) {
+      warning 'Both builder.package.path and builder.package.name were specified in the config. Only the former will be used.';
+    } else {
+      $config->set('builder.package.name' => basename($config->get('builder.package.path')));
+    }
+  }
 
   my $package_path = $config->get('builder.package.path');
   my $hardware_dir = catdir($package_path, 'hardware');
@@ -106,9 +126,10 @@ sub Run {
   $config->set('runtime.platform.path' => $hardware_path);
   # Unclear what the runtime.hardware.path variable is supposed to point to.
   $config->set('runtime.os' => get_os_name());
-  $config->set('runtime.ide.version' => '2.0.4');  # The version that we are emulating currently.
+  $config->set('runtime.ide.version' => '2040');  # The version that we are emulating currently (2.4.0).
+  $config->set('ide_version' => '2040');
   $config->set('software' => 'ARDUINO');
-  # todo: name, _id, build.fqbn
+  # todo: name, _id, build.fqbn, and the time options
   $config->set('build.source.path' => $project_dir);
   $config->set('sketch_path' => $project_dir);
   $config->set('build.path' => $build_dir);
