@@ -14,8 +14,8 @@ our @EXPORT_OK = qw(get_os_name);
 
 sub new {
   my ($class, %options) = @_;
-  my $me = bless {config => {}}, $class;
-  $me->read_file($options{file}) if $options{file};
+  my $me = bless {config => {}, files => 0}, $class;
+  $me->read_file($options{file}, %options) if $options{file};
   for my $f (@{$options{files}}) {
     $me->read_file($f, %options);
   }
@@ -25,12 +25,14 @@ sub new {
 
 sub read_file {
   my ($this, $file_name, %options) = @_;
+  return if $options{allow_missing} && ! -f $file_name;
   open my $fh, '<', $file_name or fatal "Can’t open '${file_name}': $!";
   while (my $l = <$fh>) {
     next if $l =~ m/^\s*(?:#.*)?$/;  # Only whitespace or comment
     fatal "Unparsable line in ${file_name}: ${l}" unless $l =~ m/^\s*([-0-9a-z_.]+?)\s*=\s*(.*?)\s*$/i;
     $this->{config}{$1} = $2 if !(exists $this->{config}{$1}) || $options{allow_override};
   }
+  $this->{file}++;
   return 1;
 }
 

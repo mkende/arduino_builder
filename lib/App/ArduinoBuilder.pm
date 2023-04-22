@@ -42,6 +42,7 @@ sub Run {
   my $config = App::ArduinoBuilder::Config->new(
       files => [catfile($project_dir, 'arduino_builder.local'),
                 catfile($project_dir, 'arduino_builder.config')],
+      allow_missing => 1,
       resolve => 1);
 
   if (!$build_dir) {
@@ -56,7 +57,17 @@ sub Run {
 
 
   my $package_path = $config->get('builder.package.path');
-  my $hardware_path = find_latest_revision_dir(catdir($package_path, 'hardware', $config->get('builder.package.arch')));
+  my $hardware_dir = catdir($package_path, 'hardware');
+  if (!$config->exists('builder.package.arch')) {
+    my @arch_dirs = list_sub_directories($hardware_dir);
+    if (@arch_dirs == 1) {
+      debug "Using arch '${arch_dirs[0]}'";
+      $config->set('builder.package.arch' => $arch_dirs[0]);
+    } else {
+      fatal 'The builder.package.arch config is not set and more than one arch is present in the package: '.$hardware_dir;
+    }
+  }
+  my $hardware_path = find_latest_revision_dir(catdir($hardware_dir, $config->get('builder.package.arch')));
 
   debug "Project config: \n%s", sub { $config->dump('  ') };
 
