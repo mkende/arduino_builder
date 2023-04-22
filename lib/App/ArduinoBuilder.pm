@@ -25,27 +25,35 @@ sub Run {
   my (@skip, @force, @only);
   GetOptions(
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
-      'project|p=s' => \$project_dir,
-      'build|b=s' => \$build_dir,
+      'project_dir|project|p=s' => \$project_dir,
+      'build_dir|build|b=s' => \$build_dir,
       'log_level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
       'skip=s@' => sub { push @skip, split /,/, $_[1] },  # skip this step
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
-  if ($project_dir && !$build_dir) {
-    $build_dir = getcwd();
-  } elsif (!$project_dir) {
+  my $project_dir_is_cwd = 0;
+  if (!$project_dir) {
+    $project_dir_is_cwd = 1;
     $project_dir = getcwd();
-    if (!$build_dir) {
-      $build_dir = catdir($project_dir, '_build');
-    }
   }
 
   my $config = App::ArduinoBuilder::Config->new(
       files => [catfile($project_dir, 'arduino_builder.local'),
                 catfile($project_dir, 'arduino_builder.config')],
       resolve => 1);
+
+  if (!$build_dir) {
+    if ($config->exists('builder.default_build_dir')) {
+      $build_dir = catdir($project_dir, $config->get('builder.default_build_dir'));
+    } elsif (!$project_dir_is_cwd) {
+      $build_dir = getcwd();
+    } else {
+      fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
+    }
+  }
+
 
   my $package_path = $config->get('builder.package.path');
   my $hardware_path = find_latest_revision_dir(catdir($package_path, 'hardware', $config->get('builder.package.arch')));

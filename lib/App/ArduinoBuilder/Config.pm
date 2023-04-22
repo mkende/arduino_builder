@@ -46,9 +46,9 @@ sub empty {
 
 sub get {
   my ($this, $key, %options) = @_;
+  return $options{default} if !$this->exists($key) && exists $options{default};
   $options{allow_partial} = 1 if $options{no_resolve};
   my $v = _resolve_key($key, $this->{config}, %options, allow_partial => 1);
-  return $options{default} if !defined $v && exists $options{default};
   fatal "Key '$key' does not exist in the configuration." unless defined $v;
   fatal "Key '$key' has unresolved reference to value '$1'." if $v =~ m/\{([^}]+)\}/ && !$options{allow_partial};
   return $v;
