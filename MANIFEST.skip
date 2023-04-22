@@ -1,0 +1,5 @@
+^_test/
+^.git/
+^.gitignore$
+^Makefile$
+^MANIFEST\.
