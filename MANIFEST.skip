@@ -3,3 +3,4 @@
 ^.gitignore$
 ^Makefile$
 ^MANIFEST\.
+^README\.md$
