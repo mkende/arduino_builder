@@ -1,9 +1,5 @@
 # Arduino Builder
 
-WARNING: In its current state, MKDoc is known to be extremely insecure. It
-should only be deployed behind an authenticating proxy, only giving access to
-trusted users.
-
 ## Installation
 
 You need to have Perl installed on your computer as well as the cpanm Perl
