@@ -4,10 +4,11 @@ use strict;
 use warnings;
 use utf8;
 
+use Carp qw(confess);
 use Exporter 'import';
 
 our @EXPORT = qw(fatal error warning info debug debug_large);
-our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level set_prefix));
+our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level set_prefix print_stack_on_fatal_error));
 our %EXPORT_TAGS = (all => [@EXPORT_OK], all_logger => [@EXPORT, 'log_cmd']);
 
 my $LEVEL_FATAL = 0;  # Fatal errors, abort the program.
@@ -21,6 +22,7 @@ my $LEVEL_FULL_DEBUG = 6;  # Any possibly very-lengthy debugging information.
 my $default_level = $LEVEL_INFO;
 my $current_level = $default_level;
 my $prefix = '';
+my $die_with_stack_trace = 0;
 
 sub _level_to_prefix {
   my ($level) = @_;
@@ -39,8 +41,15 @@ sub _log {
   return if $level > $current_level;
   @args = map { ref eq 'CODE' ? $_->() : $_ } @args;
   my $msg = sprintf "%s%s${message}\n", _level_to_prefix($level), $prefix, @args;
-  die $msg if $level == $LEVEL_FATAL;
-  warn $msg;
+  if ($level == $LEVEL_FATAL) {
+    if ($die_with_stack_trace) {
+      confess $msg.'Died';  # Will print "message\nDied at foo.pm line 45\n..."
+    } else {
+      die $msg;
+    }
+  } else {
+    warn $msg;
+  }
   return;
 }
 
@@ -48,6 +57,7 @@ sub _log {
 # and their return value used in the print command (useful to avoid expensive)
 # method calls when not printing them.
 sub fatal { _log($LEVEL_FATAL, @_) }
+sub fatal_trace { _log($LEVEL_FATAL, @_) }
 sub error { _log($LEVEL_ERROR, @_) }
 sub warning { _log($LEVEL_WARN, @_) }
 sub info { _log($LEVEL_INFO, @_) }
@@ -72,6 +82,10 @@ sub set_log_level {
   my ($level) = @_;
   $current_level = _string_to_level($level);
   return;
+}
+
+sub print_stack_on_fatal_error {
+  $die_with_stack_trace = $_[0];
 }
 
 1;

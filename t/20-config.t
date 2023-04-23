@@ -60,8 +60,6 @@ is($config->filter('test')->dump(), <<~EOF);
 
 is(App::ArduinoBuilder::Config->new(files=>[$simple_config_path], resolve => 1, allow_partial => 1)->dump(), $simple_config_resolved);
 
-like(dies { App::ArduinoBuilder::Config->new(files=>[$simple_config_path], resolve => 1) }, qr/Can’t resolve key 'undef.value'/);
-
 # todo: merge, read_file override order, size, empty, nested variables in replacements or variable inside braces that are not variables
 
 done_testing;

@@ -47,17 +47,28 @@ sub list_sub_directories {
   return @sub_dirs;
 }
 
+# $dir can be a single directory to search or an array ref.
+# excluded_dirs must be an array_ref
 sub find_all_files_with_extensions {
-  my ($dir, $exts, $excluded_dirs) = @_;
+  my ($dir, $exts, $excluded_dirs, $no_recurse) = @_;
   my $exts_re = join('|', @{$exts});
   my @excluded_dirs = map { rel2abs($_) } @{$excluded_dirs // []};
   my @found;
-  find(sub { push @found, $File::Find::name if -f && m/\.(?:$exts_re)$/;
-             if (-d) {
-               my $a = rel2abs($_);
-               $File::Find::prune = any { $_ eq $a || /^\./ } @excluded_dirs;
-             }
-           }, $dir);
+  my @dirs = ref $dir ? @{$dir} : $dir;
+  for my $d (@dirs) {
+    my $is_root = 1;
+    find(sub { push @found, $File::Find::name if -f && m/\.(?:$exts_re)$/;
+               if (-d) {
+                 if ($no_recurse && !$is_root) {
+                   $File::Find::prune = 1;
+                   return;
+                 }
+                 my $a = rel2abs($_);
+                 $File::Find::prune = any { $_ eq $a || /^\./ } @excluded_dirs;
+                 $is_root = 0;
+               }
+             }, $d);
+  }
   return @found;
 }
 

@@ -17,6 +17,9 @@ sub check_dep {
   fatal "Can’t find source file: ${source}" unless -f $source;
   my $mtime = -M _;  # Note: this is negated mtime due to a weird Perl quirk.
   return 1 unless -f $target;
+  # In some error situation a 0 byte .o file is written, let’s assume that a valid output is
+  # never empty (which would not be true in the general case for a build system).
+  return 1 if -z _;
   return 1 if $mtime < -M _;
 
 

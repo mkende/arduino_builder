@@ -14,7 +14,7 @@ our @EXPORT_OK = qw(get_os_name);
 
 sub new {
   my ($class, %options) = @_;
-  my $me = bless {config => {}, files => 0}, $class;
+  my $me = bless {config => {}, files => 0, options => {}}, $class;
   $me->read_file($options{file}, %options) if $options{file};
   for my $f (@{$options{files}}) {
     $me->read_file($f, %options);
@@ -25,6 +25,7 @@ sub new {
 
 sub read_file {
   my ($this, $file_name, %options) = @_;
+  %options = (%{$this->{options}}, %options);
   return if $options{allow_missing} && ! -f $file_name;
   open my $fh, '<', $file_name or fatal "Can’t open '${file_name}': $!";
   while (my $l = <$fh>) {
@@ -48,6 +49,7 @@ sub empty {
 
 sub get {
   my ($this, $key, %options) = @_;
+  %options = (%{$this->{options}}, %options);
   return $options{default} if !$this->exists($key) && exists $options{default};
   $options{allow_partial} = 1 if $options{no_resolve};
   my $v = _resolve_key($key, $this->{config}, %options, allow_partial => 1);
@@ -68,6 +70,7 @@ sub exists {
 
 sub set {
   my ($this, $key, $value, %options) = @_;
+  %options = (%{$this->{options}}, %options);
   if (exists $this->{config}{$key}) {
     return if $options{ignore_existing};
     fatal "Key '$key' already exists." unless $options{allow_override};
@@ -92,7 +95,7 @@ sub _resolve_key {
   }
   my $value = $config->{$key};
   return $value if $options{no_resolve};
-  while ($value =~ m/\{([^{}}]+)\}/g) {
+  while ($value =~ m/\{([^{}]+)\}/g) {
     my $new_key = $1;
     my $match_start = $-[0];
     my $match_len = $+[0] - $-[0];
@@ -100,8 +103,6 @@ sub _resolve_key {
     my $new_value = _resolve_key($new_key, $config, %options);
     substr $value, $match_start, $match_len, $new_value if defined $new_value;
   }
-  # We don’t materialize the resolved value if we’re using temporary values.
-  $config->{$key} = $value unless $options{with};
   return $value;
 }
 
@@ -114,16 +115,16 @@ sub get_os_name {
   return 'linux';
 }
 
+# This only does the OS resolution, not each key/value interpretation as this
+# should always be done as late as possible in case some values changes later.
 sub resolve {
   my ($this, %options) = @_;
+  %options = (%{$this->{options}}, %options);
   $options{allow_partial} = 1 if $options{no_resolve};
   my $config = $this->{config};
   my $os_name = $options{force_os_name} // get_os_name();
   for my $k (CORE::keys %$config) {
     $config->{$1} = $config->{$k} if $k =~ m/^(.*)\.$os_name$/;
-  }
-  for my $k (CORE::keys %$config) {
-    _resolve_key($k, $config, %options);
   }
   return 1;
 }
@@ -139,6 +140,7 @@ sub merge {
 sub filter {
   my ($this, $prefix) = @_;
   my $filtered = App::ArduinoBuilder::Config->new();
+  $filtered->{options}{base} = $this;
   while (my ($k, $v) = each %{$this->{config}}) {
     if ($k =~ m/^\Q$prefix\E\./) {
       $filtered->{config}{substr($k, $+[0])} = $v;
@@ -149,11 +151,10 @@ sub filter {
 
 sub dump {
   my ($this, $prefix) = @_;
-  my $c = $this->{config};
   my $out = '';
   my $p = $prefix // '';
-  for my $k (sort(CORE::keys %$c)) {
-    my $v = $c->{$k};
+  for my $k (sort($this->keys())) {
+    my $v = $this->get($k, allow_partial => 1);
     $out .= "${p}${k}=${v}\n";
   }
   return $out;

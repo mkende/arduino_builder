@@ -27,12 +27,13 @@ sub Run {
   my (@skip, @force, @only);
   GetOptions(
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
-      'project_dir|project|p=s' => \$project_dir,
-      'build_dir|build|b=s' => \$build_dir,
-      'log_level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
+      'project-dir|project|p=s' => \$project_dir,
+      'build-dir|build|b=s' => \$build_dir,
+      'log-level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
       'skip=s@' => sub { push @skip, split /,/, $_[1] },  # skip this step
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
+      'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   my $project_dir_is_cwd = 0;
@@ -45,6 +46,7 @@ sub Run {
       files => [catfile($project_dir, 'arduino_builder.local'),
                 catfile($project_dir, 'arduino_builder.config')],
       allow_missing => 1,
+      allow_partial => 1,
       resolve => 1);
 
   if (!$build_dir) {
@@ -158,15 +160,9 @@ sub Run {
 
   # TODO: we should probably never call resolve because variables can change
   # but the config could have a cache of resolved values with invalidation on
-  # the right variable change.
+  # the right variable change. BUT we still need to do the os_name suffix
+  # resolution.
   $config->resolve(allow_partial => 1);
-
-  my $builder = App::ArduinoBuilder::Builder->new($config);
-
-  $builder->run_hook('prebuild');
-
-  $config->append('includes', '"-I'.$config->get('build.core.path').'"');
-  $config->append('includes', '"-I'.$config->get('build.variant.path').'"');
 
   my $run_step = sub {
     my ($step) = @_;
@@ -177,7 +173,18 @@ sub Run {
     return any { $_ eq $step } @force;
   };
 
+
+  my $builder = App::ArduinoBuilder::Builder->new($config);
   my $built_something = 0;
+
+  $builder->run_hook('prebuild');
+
+  $config->append('includes', '"-I'.$config->get('build.core.path').'"');
+  $config->append('includes', '"-I'.$config->get('build.variant.path').'"');
+
+  # This should be set to 1 first, if we start with doing library discovery at
+  # some point.
+  $config->set('build.library_discovery_phase' => 0);
 
   if ($run_step->('core')) {
     info 'Building core...';
@@ -188,9 +195,56 @@ sub Run {
     $builder->run_hook('core.postbuild');
   }
 
+  # Reference for all this library part:
+  # https://arduino.github.io/arduino-cli/0.32/library-specification/
+  # For now, we are not doing library discovery automatically. See also this:
+  # https://arduino.github.io/arduino-cli/0.32/sketch-build-process/#dependency-resolution
+  my $lib_config = $config->filter('builder.library');
+  my @all_libs = $lib_config->keys();  # We will add config in lib_config, so let’s get the set of keys now.
+  # We are first adding all the includes path for all the library before building any of them.
+  for my $l ($lib_config->keys()) {
+    my $lib_dir = $lib_config->get($l);
+    fatal "Library directory does not exist for library '${l}': ${lib_dir}" unless -d $lib_dir;
+    my $lib_properties_file = catfile($lib_dir, 'library.properties');
+    my $has_lib_properties = -f $lib_properties_file;
+    my $recursive_lib = $has_lib_properties && -d catdir($lib_dir, 'src');
+    # These config entry (and any other added to $lib_config) are undocummented and should never be
+    # set by the user.
+    $lib_config->set($l.'.is_flat' => !$recursive_lib);
+    if ($recursive_lib) {
+      $config->append('includes', '"-I'.catdir($lib_dir, 'src').'"');
+    } else {
+      $config->append('includes', "\"-I${lib_dir}\"");
+    }
+    if ($has_lib_properties) {
+      my $lib_properties = App::ArduinoBuilder::Config->new(file => $lib_properties_file);
+      $lib_config->set($l.'.name' => $lib_properties->get('name', default => $l));
+    }
+  }
+  # TODO: we are ignoring the dot_a_linkage properties of the libraries (unclear what it brings)
+  # and also the precompiled
+  if ($run_step->('libraries')) {
+    info 'Building libraries...';
+    for my $l (@all_libs) {
+      # Todo: we could add "lib-$l" pseudo-steps, but we need to take care of the --only
+      # interaction with the 'libraries' step.
+      info '  Building library %s...', $lib_config->get("${l}.name");
+      my $base_dir = $lib_config->get($l);
+      my $output_dir = catdir($build_dir, 'libs', $l);
+      my $built_lib;
+      if ($lib_config->get("${l}.is_flat")) {
+        my $utility_dir = catdir($base_dir, 'utility');
+        my @dirs = ($base_dir, (-d $utility_dir ? $utility_dir : ()));
+        $built_lib = $builder->build_object_files(\@dirs, $output_dir, [], $force->('libraries'), 1);
+      }  else {
+        $built_lib = $builder->build_object_files(catdir($base_dir, 'src'), $output_dir, [], $force->('libraries'));
+      }
+      info ($built_lib ? '    Success' : '    Already up-to-date');
+      $built_something |= $built_lib;
+    }
+  }
 
   $config->append('includes', '"-I'.$config->get('build.source.path').'"');
-
 
   if ($run_step->('sketch')) {
     info 'Building sketch...';
