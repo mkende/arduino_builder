@@ -82,7 +82,9 @@ sub Run {
   }
 
   my $package_path = $config->get('builder.package.path');
+  fatal "Package path does not exist: ${package_path}" unless -d $package_path;
   my $hardware_dir = catdir($package_path, 'hardware');
+  $hardware_dir = $package_path unless -d $hardware_dir;
   if (!$config->exists('builder.package.arch')) {
     my @arch_dirs = list_sub_directories($hardware_dir);
     if (@arch_dirs == 1) {
@@ -146,15 +148,18 @@ sub Run {
   $config->set('build.system.path', catdir($hardware_path, 'system'));
   $config->set('build.variant.path', catdir($hardware_path, 'variants', $config->get('build.variant')));
 
-  my $tools_dir = catdir($package_path, 'tools');
-  my @tools = list_sub_directories($tools_dir);
-  for my $t (@tools) {
-    debug "Found tool: $t";
-    my $tool_path = catdir($tools_dir, $t);
-    my $latest_tool_path = find_latest_revision_dir($tool_path);
-    $config->set("runtime.tools.${t}.path", $latest_tool_path);
-    for my $v (list_sub_directories($tools_dir)) {
-      $config->set("runtime.tools.${t}-${v}.path", catdir($tool_path, $v));
+  my @tools_dirs = (catdir($package_path, 'tools'));
+  for my $tools_dir (@tools_dirs) {
+    next unless -d $tools_dir;
+    my @tools = list_sub_directories($tools_dir);
+    for my $t (@tools) {
+      debug "Found tool: $t";
+      my $tool_path = catdir($tools_dir, $t);
+      my $latest_tool_path = find_latest_revision_dir($tool_path);
+      $config->set("runtime.tools.${t}.path", $latest_tool_path);
+      for my $v (list_sub_directories($tools_dir)) {
+        $config->set("runtime.tools.${t}-${v}.path", catdir($tool_path, $v));
+      }
     }
   }
 
