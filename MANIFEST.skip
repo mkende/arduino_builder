@@ -7,4 +7,6 @@
 ^Makefile$
 ^MANIFEST\.
 ^README\.md$
+^blib/
 ^example/
+^pm_to_blib$
