@@ -152,7 +152,7 @@ sub build_object_files {
 
 sub link_executable {
   my ($this, $object_files, $archive) = @_;
-  $this->_run_recipe_pattern('c.combine', with => {object_files => join(' ', @{$object_files}), archive_file => $archive, archive_file_path => catfile($this->{config}->get('build.path'), $archive)});
+  $this->_run_recipe_pattern('c.combine', with => {object_files => '"'.join('" "', @{$object_files}).'"', archive_file => $archive, archive_file_path => catfile($this->{config}->get('build.path'), $archive)});
   return;
 }
 
