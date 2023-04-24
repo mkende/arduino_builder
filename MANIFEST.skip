@@ -1,6 +1,10 @@
 ^_test/
 ^.git/
 ^.gitignore$
+.*\.sublime-project$
+.*\.sublime-workspace$
+^.*\.tar.gz
 ^Makefile$
 ^MANIFEST\.
 ^README\.md$
+^example/

@@ -12,6 +12,6 @@ is(warns { warning 'Test: %s', 'foobar' } , "WARNING: Test: foobar\n");
 ok(no_warnings { debug 'won’t be printer' });
 
 App::ArduinoBuilder::Logger::set_log_level('DEBUG');
-is(warns { debug 'is printed' } , "is printed\n");
+is(warns { debug 'is printed' } , "DEBUG: is printed\n");
 
 done_testing;

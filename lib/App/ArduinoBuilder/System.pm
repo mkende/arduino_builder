@@ -4,11 +4,12 @@ use strict;
 use warnings;
 use utf8;
 
+use Cwd;
 use Exporter 'import';
 use File::Spec::Functions;
 use List::Util 'first';
 
-our @EXPORT_OK = qw(find_arduino_dir);
+our @EXPORT_OK = qw(find_arduino_dir system_cwd);
 
 sub find_arduino_dir {
   my @tests;
@@ -24,4 +25,16 @@ sub find_arduino_dir {
     }
   }
   return first { -d } @tests;
+}
+
+sub system_cwd {
+  my $cwd = getcwd();
+  # Todo: we could have a "use_native_cygwin" option somewhere in the improbable
+  # case of a native toolchain to deactivate this logic (as well as using
+  # /dev/null instal of nul in the builder).
+  if ($^O eq 'cygwin') {
+    $cwd = `cygpath -w '${cwd}'`;
+    chomp($cwd);
+  }
+  return $cwd;
 }

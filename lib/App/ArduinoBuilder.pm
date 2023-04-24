@@ -9,9 +9,8 @@ use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_ex
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
-use App::ArduinoBuilder::System 'find_arduino_dir';
+use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd';
 
-use Cwd;
 use File::Basename;
 use File::Spec::Functions;
 use Getopt::Long;
@@ -39,7 +38,7 @@ sub Run {
   my $project_dir_is_cwd = 0;
   if (!$project_dir) {
     $project_dir_is_cwd = 1;
-    $project_dir = getcwd();
+    $project_dir = system_cwd();
   }
 
   my $config = App::ArduinoBuilder::Config->new(
@@ -49,11 +48,13 @@ sub Run {
       allow_partial => 1,
       resolve => 1);
 
+  $config->set('builder.project_dir' => $project_dir);
+
   if (!$build_dir) {
     if ($config->exists('builder.default_build_dir')) {
-      $build_dir = catdir($project_dir, $config->get('builder.default_build_dir'));
+      $build_dir = $config->get('builder.default_build_dir');
     } elsif (!$project_dir_is_cwd) {
-      $build_dir = getcwd();
+      $build_dir = system_cwd();
     } else {
       fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
     }
@@ -61,6 +62,8 @@ sub Run {
 
   if (!$config->exists('builder.package.path')) {
     fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
+    # TODO: the core package can also be installed in a "hardware" directory in
+    # the sketch directory. We should search for it there.
     my $arduino_dir = find_arduino_dir();
     fatal "The builder.package.path config is not set and Arduino installation directory not found" unless $arduino_dir;
     debug "Using arduino directory: ${arduino_dir}";
@@ -100,8 +103,6 @@ sub Run {
     $config->merge($board);
   }
 
-  my $menu_config = $config->filter('builder.menu');
-
   my $boards_config_path = catfile($hardware_path, 'boards.txt');
   if (-f $boards_config_path) {
     my $board_name = $config->get('builder.package.board');
@@ -112,6 +113,7 @@ sub Run {
     warning "Could not find boards.txt file.";
   }
 
+  my $menu_config = $config->filter('builder.menu');
   my $board_menu = $config->filter('menu');
   for my $m ($menu_config->keys()) {
     my $v = $menu_config->get($m);
@@ -132,6 +134,9 @@ sub Run {
   $config->set('ide_version' => '2040');
   $config->set('software' => 'ARDUINO');
   # todo: name, _id, build.fqbn, and the time options
+  # Note: build.source.path is the root of the source. So, if we build from an
+  # src sub-directory (for example), it should be that directory and not the
+  # root of the project directory.
   $config->set('build.source.path' => $project_dir);
   $config->set('sketch_path' => $project_dir);
   $config->set('build.path' => $build_dir);
