@@ -94,9 +94,9 @@ sub Run {
       fatal 'The builder.package.arch config is not set and more than one arch is present in the package: '.$hardware_dir;
     }
   }
-  my $hardware_path = find_latest_revision_dir(catdir($hardware_dir, $config->get('builder.package.arch')));
-
   debug "Project config: \n%s", sub { $config->dump('  ') };
+
+  my $hardware_path = find_latest_revision_dir(catdir($hardware_dir, $config->get('builder.package.arch')));
 
   my $boards_local_config_path = catfile($hardware_path, 'boards.local.txt');
   if (-f $boards_local_config_path) {
@@ -163,6 +163,11 @@ sub Run {
     }
   }
 
+  my $config_append = $config->filter('builder.config.append');
+  for my $k ($config_append->keys()) {
+    $config->append($k, $config_append->get($k));
+  }
+
   # TODO: we should create config for all the tools defined by all the other
   # platform (not overriding the existing definitions). There are some other
   # considerations that we are not handling yet from:
@@ -173,6 +178,8 @@ sub Run {
   # the right variable change. BUT we still need to do the os_name suffix
   # resolution.
   $config->resolve(allow_partial => 1);
+
+  full_debug "Complete configuration: \n%s", sub { $config->dump('  ') };
 
   my $run_step = sub {
     my ($step) = @_;

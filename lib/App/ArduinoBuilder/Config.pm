@@ -81,15 +81,19 @@ sub set {
 
 sub append {
   my ($this, $key, $value) = @_;
-  $this->{config}{$key} .= ($this->{config}{$key} ? ' ' : '').$value;
+  if ($this->{config}{$key}) {
+    $this->{config}{$key} .= ' '.$value;
+  } else {
+    $this->{config}{$key} = $value;
+  }
   return;
 }
 
 sub _resolve_key {
   my ($key, $config, %options) = @_;
   return $options{with}{$key} if exists $options{with}{$key};
-  return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base} && $options{base}->exists($key);
   if (not exists $config->{$key}) {
+    return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base} && $options{base}->exists($key);
     fatal "Can’t resolve key '${key}' in the configuration." unless $options{allow_partial};
     return;
   }
