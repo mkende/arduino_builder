@@ -266,7 +266,9 @@ sub Run {
   if ($run_step->('sketch')) {
     info 'Building sketch...';
     $builder->run_hook('sketch.prebuild');
-    my $built_sketch = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir], $force->('sketch'));
+    # TODO: add configuration option for the ignored directories and also a way to
+    # build only the code inside the src/ directory
+    my $built_sketch = $builder->build_object_files($config->get('build.source.path'), catdir($build_dir, 'sketch'), [$build_dir, 'third_party', 'third_parties'], $force->('sketch'));
     info ($built_sketch ? '  Success' : '  Already up-to-date');
     $built_something |= $built_sketch;
     $builder->run_hook('sketch.postbuild');
