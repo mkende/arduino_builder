@@ -57,6 +57,7 @@ sub _ino_to_cpp {
   open my $fi, '<', "${source}" or fatal "Can’t open the source file '${source}' for reading: $!";
   open my $fo, '>', "${target}.cpp-pre" or fatal "Can’t open intermediate file '${target}.cpp-pre' for writing: $!";
   print $fo "#include \"Arduino.h\"\n";
+  print $fo "#line 1 \"${source}\"\n";
   while (my $l = <$fi>) {
     print $fo $l;
   }
