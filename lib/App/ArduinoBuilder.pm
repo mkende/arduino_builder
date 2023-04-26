@@ -12,6 +12,7 @@ use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd';
 
 use File::Basename;
+use File::Path 'remove_tree';
 use File::Spec::Functions;
 use Getopt::Long;
 use List::Util 'any', 'none', 'first';
@@ -35,6 +36,9 @@ sub Run {
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
+  fatal "More than one command specified: ".join(' ', @ARGV) if @ARGV > 1;
+  my $command = @ARGV ? $ARGV[0] : 'build';
+
   my $project_dir_is_cwd = 0;
   if (!$project_dir) {
     $project_dir_is_cwd = 1;
@@ -54,6 +58,44 @@ sub Run {
     if ($config->exists('builder.default_build_dir')) {
       $build_dir = $config->get('builder.default_build_dir');
     } elsif (!$project_dir_is_cwd) {
+      $build_dir = system_cwd();
+    } else {
+      fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
+    }
+  }
+
+  if ($command eq 'build') {
+    build($config, $build_dir, \@skip, \@force, \@only);
+  } elsif ($command eq 'clean') {
+    clean($config, $build_dir);
+  } else {
+    fatal "Unknown command: ${command}";
+  }
+}
+
+sub clean {
+  my ($config, $build_dir) = @_;
+
+  # TODO: add a way to clean only parts of the projects.
+  if ($build_dir eq $config->get('builder.default_build_dir')) {
+    remove_tree($build_dir, {safe => 1, keep_root => 1});
+  } else {
+    warning "For safety reason we can only clean build directory specified in the project";
+    warning "config. You should run `rm -rf` manually.";
+    fatal "Not cleaning context dependent directory: ${build_dir}";
+  }
+}
+
+sub build {
+  my ($config, $build_dir, @array_args) = @_;
+  my @skip = @{$array_args[0]};
+  my @force = @{$array_args[1]};
+  my @only = @{$array_args[2]};
+
+  if (!$build_dir) {
+    if ($config->exists('builder.default_build_dir')) {
+      $build_dir = $config->get('builder.default_build_dir');
+    } elsif (!$config->get('builder.project_dir_is_cwd')) {
       $build_dir = system_cwd();
     } else {
       fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
@@ -139,8 +181,8 @@ sub Run {
   # Note: build.source.path is the root of the source. So, if we build from an
   # src sub-directory (for example), it should be that directory and not the
   # root of the project directory.
-  $config->set('build.source.path' => $project_dir);
-  $config->set('sketch_path' => $project_dir);
+  $config->set('build.source.path' => $config->get('builder.project_dir'));
+  $config->set('sketch_path' => $config->get('builder.project_dir'));
   $config->set('build.path' => $build_dir);
   $config->set('build.project_name' => $config->get('builder.project_name'));
   $config->set('build.arch' => uc($config->get('builder.package.arch')));  # Undocumented but it seems that it’s always upper case.
