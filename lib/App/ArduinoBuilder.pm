@@ -143,7 +143,7 @@ sub Run {
   $config->set('sketch_path' => $project_dir);
   $config->set('build.path' => $build_dir);
   $config->set('build.project_name' => $config->get('builder.project_name'));
-  $config->set('build.arch' => $config->get('builder.package.arch'));
+  $config->set('build.arch' => uc($config->get('builder.package.arch')));  # Undocumented but it seems that it’s always upper case.
   $config->set('build.core.path', catdir($hardware_path, 'cores', $config->get('build.core')));
   $config->set('build.system.path', catdir($hardware_path, 'system'));
   $config->set('build.variant.path', catdir($hardware_path, 'variants', $config->get('build.variant')));
