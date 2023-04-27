@@ -8,7 +8,6 @@ use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::DepCheck 'check_dep';
 use App::ArduinoBuilder::FilePath 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger ':all_logger';
-use File::Basename 'basename';
 use File::Path 'make_path';
 use File::Spec::Functions 'catfile';
 
@@ -110,18 +109,39 @@ sub _add_to_archive {
   return;
 }
 
+
+package ObjectNameBuilder {
+  use File::Basename 'fileparse';
+  use File::Spec::Functions 'catfile';
+
+  sub new {
+    my ($class, $target_dir) = @_;
+    return bless {target_dir => $target_dir, files => {}}, $class;
+  }
+
+  sub object_for {
+    my ($this, $source) = @_;
+    my $basename = fileparse($source, @supported_source_extensions);
+    my $count = $this->{files}{$basename}++;
+    $basename .= "${count}." if $count;
+    return catfile($this->{target_dir}, "${basename}o");
+  }
+}
+
 # target_dir has all the intermediate file, $archive is a file name that goes in build.path.
 sub build_archive {
   my ($this, $source_dirs, $target_dir, $archive, $force) = @_;
   make_path($target_dir);
   my $did_something = 0;
+  my $obj_name = ObjectNameBuilder->new($target_dir);
   for my $d (@{$source_dirs}) {
-    my @sources = find_all_files_with_extensions($d, [@supported_source_extensions]);
+    # BUG: There is still a bug here (and in build_object_files) which is that if a file is removed
+    # from the sources and there is another file with the same basename, we will do weird things
+    # with the object files that will be mixed. This is unavoidable for now, the project needs to be
+    # cleaned when files are deleted.
+    my @sources = sort (find_all_files_with_extensions($d, [@supported_source_extensions]));
     for my $s (@sources) {
-      # BUG: There is a bug if several files have the same name in the core, but this is improbable...
-      # Note: if a source file is removed, it won’t be removed from the archive. So this is not
-      # perfecte but probably acceptable.
-      my $object_file = catfile($target_dir, basename($s).'.o');
+      my $object_file = $obj_name->object_for($s);
       if ($force || check_dep($s, $object_file)) {
         $did_something = 1;
         $this->build_file($s, $object_file);
@@ -138,11 +158,11 @@ sub build_archive {
 sub build_object_files {
   my ($this, $source_dir, $target_dir, $excluded_dirs, $force, $no_recurse) = @_;
   make_path($target_dir);
-  my @sources = find_all_files_with_extensions($source_dir, [@supported_source_extensions], $excluded_dirs, $no_recurse);
+  my @sources = sort (find_all_files_with_extensions($source_dir, [@supported_source_extensions], $excluded_dirs, $no_recurse));
   my $did_something = 0;
+  my $obj_name = ObjectNameBuilder->new($target_dir);
   for my $s (@sources) {
-    # Same BUG here as in build_archive
-    my $object_file = catfile($target_dir, basename($s).'.o');
+    my $object_file = $obj_name->object_for($s);
     if ($force || check_dep($s, $object_file)) {
       $did_something = 1;
       $this->build_file($s, $object_file);
