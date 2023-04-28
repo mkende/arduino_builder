@@ -121,10 +121,10 @@ package ObjectNameBuilder {
 
   sub object_for {
     my ($this, $source) = @_;
-    my $basename = fileparse($source, @supported_source_extensions);
+    my $basename = fileparse($source);
     my $count = $this->{files}{$basename}++;
-    $basename .= "${count}." if $count;
-    return catfile($this->{target_dir}, "${basename}o");
+    $basename .= ".${count}" if $count;
+    return catfile($this->{target_dir}, "${basename}.o");
   }
 }
 
