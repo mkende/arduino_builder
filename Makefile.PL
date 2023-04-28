@@ -28,6 +28,9 @@ WriteMakefile(
     META_MERGE => {
       'meta-spec' => { version => 2 },
       dynamic_config => 0,
+      no_index => {
+        # ignores child of App::ArduinoBuilder, but not App::ArduinoBuilder itself.
+        namespace => [ 'App::ArduinoBuilder' ],
       prereqs => {
         test => {
           suggests => {
