@@ -34,7 +34,7 @@ sub read_file {
     $this->{config}{$1} = $2 if !(exists $this->{config}{$1}) || $options{allow_override};
   }
   $this->resolve(%options) unless $options{no_resolve};
-  $this->{file}++;
+  $this->{nb_files}++;
   return 1;
 }
 
@@ -46,6 +46,11 @@ sub size {
 sub empty {
   my ($this) = @_;
   return $this->size() == 0;
+}
+
+sub nb_files {
+  my ($this) = @_;
+  return $this->{nb_files}
 }
 
 sub get {
@@ -136,11 +141,11 @@ sub resolve {
   return 1;
 }
 
-# Definition from this are kept and not replaced by those from others.
+# By default, definition from this are kept and not replaced by those from others.
 sub merge {
-  my ($this, $other) = @_;
+  my ($this, $other, %options) = @_;
   while (my ($k, $v) = each %{$other->{config}}) {
-    $this->{config}{$k} = $v unless exists $this->{config}{$k};
+    $this->{config}{$k} = $v if $options{allow_override} || !exists $this->{config}{$k};
   }
 }
 

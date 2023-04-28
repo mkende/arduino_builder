@@ -138,29 +138,36 @@ sub build {
 
   my $hardware_path = find_latest_revision_dir(catdir($hardware_dir, $config->get('builder.package.arch')));
 
-  my $boards_local_config_path = catfile($hardware_path, 'boards.local.txt');
-  if (-f $boards_local_config_path) {
-    my $board_name = $config->get('builder.package.board');
-    my $board = App::ArduinoBuilder::Config->new(file => $boards_local_config_path)->filter($board_name);
-    $config->merge($board);
-  }
+  my $all_boards_config = App::ArduinoBuilder::Config->new(
+      files => [catfile($hardware_path, 'boards.local.txt'),
+                catfile($hardware_path, 'boards.txt')],
+      allow_missing => 1);
+  warning "Could not find any board config file" unless $all_boards_config->nb_files();
+  my $board_name = $config->get('builder.package.board');
+  my $board_config = $all_boards_config->filter($board_name);
+  # In $all_board_config we may have interesting values (or maybe even important
+  # ones – altough not with the core I checked). In particular the name of each
+  # menu. However, merging it here result in a dump that is far too large when
+  # we are in full debug mode.
+  #$board_config->merge($all_boards_config);
 
-  my $boards_config_path = catfile($hardware_path, 'boards.txt');
-  if (-f $boards_config_path) {
-    my $board_name = $config->get('builder.package.board');
-    my $board = App::ArduinoBuilder::Config->new(file => $boards_config_path)->filter($board_name);
-    fatal "Board '${board_name}' not found in boards.txt." if $board->empty();
-    $config->merge($board);
-  } else {
-    warning "Could not find boards.txt file.";
-  }
-
+  # We should check whether a menu can be configured in the platform.txt, if so
+  # this block should be moved to below (and platform.txt should be merged into
+  # what is currently called board_config).
   my $menu_config = $config->filter('builder.menu');
-  my $board_menu = $config->filter('menu');
+  my $board_menu = $board_config->filter('menu');
   for my $m ($menu_config->keys()) {
     my $v = $menu_config->get($m);
-    $config->merge($board_menu->filter("${m}.${v}"));
+    # This is one of the rare case where we want a merge to override previously
+    # existing config. Although we still don’t want to override config set
+    # directly by the user (e.g. on the command line), which is way all this is
+    # done in a temporary config.
+    my $menu_value = $board_menu->filter("${m}.${v}");
+    full_debug "Merging menu values for menu '${m}' with key '${v}':\n%s", sub { $menu_value->dump('  ') };
+    $board_config->merge($menu_value, allow_override => 1);
   }
+  $config->merge($board_config);
+  # TODO: warn about unset menus
 
   # TODO: Handles core, variant and tools references:
   # https://arduino.github.io/arduino-cli/0.32/platform-specification/#core-reference
