@@ -179,8 +179,8 @@ sub build {
   $config->set('runtime.platform.path' => $hardware_path);
   # Unclear what the runtime.hardware.path variable is supposed to point to.
   $config->set('runtime.os' => get_os_name());
-  $config->set('runtime.ide.version' => '2040');  # The version that we are emulating currently (2.4.0).
-  $config->set('ide_version' => '2040');
+  $config->set('runtime.ide.version' => '10607');
+  $config->set('ide_version' => '10607');
   $config->set('software' => 'ARDUINO');
   # todo: name, _id, build.fqbn, and the time options
   # Note: build.source.path is the root of the source. So, if we build from an
