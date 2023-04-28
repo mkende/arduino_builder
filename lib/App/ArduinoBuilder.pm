@@ -48,9 +48,7 @@ sub Run {
   my $config = App::ArduinoBuilder::Config->new(
       files => [catfile($project_dir, 'arduino_builder.local'),
                 catfile($project_dir, 'arduino_builder.config')],
-      allow_missing => 1,
-      allow_partial => 1,
-      resolve => 1);
+      allow_missing => 1);
 
   $config->set('builder.project_dir' => $project_dir);
 
@@ -143,14 +141,14 @@ sub build {
   my $boards_local_config_path = catfile($hardware_path, 'boards.local.txt');
   if (-f $boards_local_config_path) {
     my $board_name = $config->get('builder.package.board');
-    my $board = App::ArduinoBuilder::Config->new(file => $boards_local_config_path, resolve => 1, allow_partial => 1)->filter($board_name);
+    my $board = App::ArduinoBuilder::Config->new(file => $boards_local_config_path)->filter($board_name);
     $config->merge($board);
   }
 
   my $boards_config_path = catfile($hardware_path, 'boards.txt');
   if (-f $boards_config_path) {
     my $board_name = $config->get('builder.package.board');
-    my $board = App::ArduinoBuilder::Config->new(file => $boards_config_path, resolve => 1, allow_partial => 1)->filter($board_name);
+    my $board = App::ArduinoBuilder::Config->new(file => $boards_config_path)->filter($board_name);
     fatal "Board '${board_name}' not found in boards.txt." if $board->empty();
     $config->merge($board);
   } else {
@@ -214,12 +212,6 @@ sub build {
   # platform (not overriding the existing definitions). There are some other
   # considerations that we are not handling yet from:
   # https://arduino.github.io/arduino-cli/0.32/package_index_json-specification/#how-a-tools-path-is-determined-in-platformtxt
-
-  # TODO: we should probably never call resolve because variables can change
-  # but the config could have a cache of resolved values with invalidation on
-  # the right variable change. BUT we still need to do the os_name suffix
-  # resolution.
-  $config->resolve(allow_partial => 1);
 
   full_debug "Complete configuration: \n%s", sub { $config->dump('  ') };
 

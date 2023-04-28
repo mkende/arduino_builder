@@ -14,13 +14,13 @@ our @EXPORT_OK = qw(get_os_name);
 
 sub new {
   my ($class, %options) = @_;
-  my $me = bless {config => {}, files => 0, options => {}}, $class;
-  $me->read_file($options{file}, %options) if $options{file};
+  my $this = bless {config => {}, files => 0, options => {}}, $class;
+  $this->read_file($options{file}, %options) if $options{file};
   for my $f (@{$options{files}}) {
-    $me->read_file($f, %options);
+    $this->read_file($f, %options, no_resolve => 1);
   }
-  $me->resolve(%options) if $options{resolve};
-  return $me;
+  $this->resolve(%options) unless $options{no_resolve};
+  return $this;
 }
 
 sub read_file {
@@ -33,6 +33,7 @@ sub read_file {
     fatal "Unparsable line in ${file_name}: ${l}" unless $l =~ m/^\s*([-0-9a-z_.]+?)\s*=\s*(.*?)\s*$/i;
     $this->{config}{$1} = $2 if !(exists $this->{config}{$1}) || $options{allow_override};
   }
+  $this->resolve(%options) unless $options{no_resolve};
   $this->{file}++;
   return 1;
 }
@@ -121,10 +122,12 @@ sub get_os_name {
 
 # This only does the OS resolution, not each key/value interpretation as this
 # should always be done as late as possible in case some values changes later.
+#
+# Should be called manually only if you call set() with OS specific keys (mainly
+# in tests).
 sub resolve {
   my ($this, %options) = @_;
   %options = (%{$this->{options}}, %options);
-  $options{allow_partial} = 1 if $options{no_resolve};
   my $config = $this->{config};
   my $os_name = $options{force_os_name} // get_os_name();
   for my $k (CORE::keys %$config) {
