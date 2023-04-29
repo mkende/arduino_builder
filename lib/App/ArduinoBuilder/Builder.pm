@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use utf8;
 
+use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::DepCheck 'check_dep';
 use App::ArduinoBuilder::FilePath 'find_all_files_with_extensions';
@@ -109,7 +110,9 @@ sub _add_to_archive {
   return;
 }
 
-
+# Object to avoid collision in generated object file names. Both because we
+# flatten the directory structure of the sources that we build and also because
+# archive files may only reference the file names.
 package ObjectNameBuilder {
   use File::Basename 'fileparse';
   use File::Spec::Functions 'catfile';
@@ -134,6 +137,7 @@ sub build_archive {
   make_path($target_dir);
   my $did_something = 0;
   my $obj_name = ObjectNameBuilder->new($target_dir);
+  my @objects;
   for my $d (@{$source_dirs}) {
     # BUG: There is still a bug here (and in build_object_files) which is that if a file is removed
     # from the sources and there is another file with the same basename, we will do weird things
@@ -143,11 +147,18 @@ sub build_archive {
     for my $s (@sources) {
       my $object_file = $obj_name->object_for($s);
       if ($force || check_dep($s, $object_file)) {
+        push @objects, $object_file;
         $did_something = 1;
-        $this->build_file($s, $object_file);
-        $this->_add_to_archive($object_file, $archive);
+        default_runner()->execute(
+          sub {
+            $this->build_file($s, $object_file);
+          });
       }
     }
+  }
+  default_runner->wait();
+  for my $o (@objects) {
+    $this->_add_to_archive($o, $archive);
   }
   return $did_something;
 }
@@ -165,9 +176,13 @@ sub build_object_files {
     my $object_file = $obj_name->object_for($s);
     if ($force || check_dep($s, $object_file)) {
       $did_something = 1;
-      $this->build_file($s, $object_file);
+      default_runner()->execute(
+        sub {
+          $this->build_file($s, $object_file);
+        });
     }
   }
+  default_runner->wait();
   return $did_something;
 }
 

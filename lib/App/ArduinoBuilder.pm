@@ -6,6 +6,7 @@ use warnings;
 use utf8;
 
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
+use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
@@ -34,6 +35,7 @@ sub Run {
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
+      'j=i' => sub { default_runner()->set_max_parallel_tasks($_[1]) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   fatal "More than one command specified: ".join(' ', @ARGV) if @ARGV > 1;
