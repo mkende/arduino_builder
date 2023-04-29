@@ -81,6 +81,34 @@ other files below.
 
 =back
 
+=head1 CONFIGURATION VALUES
+
+=over 4
+
+=item C<builder.project_name>
+
+=item C<builder.package.name>
+
+=item C<builder.package.path>
+
+=item C<builder.package.arch>
+
+=item C<builder.package.board>
+
+=item C<builder.default_build_dir>
+
+=item C<builder.source.path>
+
+=item C<builder.source.is_recursive>
+
+=item C<builder.menu.XXX>
+
+=back
+
+Other standard properties of the Arduino build system,
+L<documented here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#global-predefined-properties,
+are also implemented and can be used when defining the config of your project.
+
 =head1 CAVEATS
 
 Not all features of the Arduino GUI are currently implemented. The main missing

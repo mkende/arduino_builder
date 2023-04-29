@@ -64,6 +64,19 @@ sub Run {
     }
   }
 
+  if (!$config->exists('builder.source.path')) {
+    my $d = first { -d catdir($project_dir, $_) } qw(src srcs source sources);
+    if (defined $d) {
+      $config->set('builder.source.path' => catdir($project_dir, $d));
+      $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+    } else {
+      $config->set('builder.source.path' => $project_dir);
+      $config->set('builder.source.is_recursive' => 0, ignore_existing => 1);
+    }
+  } else {
+    $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+  }
+
   if ($command eq 'build') {
     build($config, $build_dir, \@skip, \@force, \@only);
   } elsif ($command eq 'clean') {
@@ -91,16 +104,6 @@ sub build {
   my @skip = @{$array_args[0]};
   my @force = @{$array_args[1]};
   my @only = @{$array_args[2]};
-
-  if (!$build_dir) {
-    if ($config->exists('builder.default_build_dir')) {
-      $build_dir = $config->get('builder.default_build_dir');
-    } elsif (!$config->get('builder.project_dir_is_cwd')) {
-      $build_dir = system_cwd();
-    } else {
-      fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
-    }
-  }
 
   if (!$config->exists('builder.package.path')) {
     fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
@@ -185,11 +188,8 @@ sub build {
   $config->set('ide_version' => '10607');
   $config->set('software' => 'ARDUINO');
   # todo: name, _id, build.fqbn, and the time options
-  # Note: build.source.path is the root of the source. So, if we build from an
-  # src sub-directory (for example), it should be that directory and not the
-  # root of the project directory.
-  $config->set('build.source.path' => $config->get('builder.project_dir'));
-  $config->set('sketch_path' => $config->get('builder.project_dir'));
+  $config->set('build.source.path' => $config->get('builder.source.path'));
+  $config->set('sketch_path' => $config->get('builder.source.path'));
   $config->set('build.path' => $build_dir);
   $config->set('build.project_name' => $config->get('builder.project_name'));
   $config->set('build.arch' => uc($config->get('builder.package.arch')));  # Undocumented but it seems that it’s always upper case.
