@@ -329,7 +329,9 @@ sub build {
   # removed, we won’t remove it’s object file. I guess we could try to detect it.
   # Meanwhile it’s probably acceptable to ask for a cleanup from time to time.
   my @object_files = find_all_files_with_extensions(catdir($build_dir, 'sketch'), ['o']);
-  push @object_files, find_all_files_with_extensions(catdir($build_dir, 'libs'), ['o']);
+  for my $l (@all_libs) {
+    push @object_files, find_all_files_with_extensions(catdir($build_dir, 'libs', $l), ['o']);
+  }
   debug 'Object files: '.join(', ', @object_files);
 
   info 'Linking binary...';
