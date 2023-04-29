@@ -42,9 +42,11 @@ If this is the case, `arduino_builder` will try to auto-detect as much of your
 environment as possible. Otherwise you might have to point it to the right
 places to find these libraries and tools.
 
-## Command line documentation
+## Documentation
 
-For the full documentation of the command line of the tool as well as the
-documentation of its configuration files. You can either call
-`arduino_builder --help` or read
-[this help online](https://metacpan.org/dist/App-ArduinoBuilder/view/script/arduino_builder).
+The full documentation of the tool is
+[available online here](https://metacpan.org/dist/App-ArduinoBuilder/view/script/arduino_builder)
+or you can read it locally with `arduino_builder --help`.
+
+The source code contains a minimal example of a project built with Arduino
+Builder [here](https://github.com/mkende/arduino_builder/tree/main/example).
