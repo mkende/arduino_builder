@@ -31,6 +31,7 @@ WriteMakefile(
       no_index => {
         # ignores child of App::ArduinoBuilder, but not App::ArduinoBuilder itself.
         namespace => [ 'App::ArduinoBuilder' ],
+      },
       prereqs => {
         test => {
           suggests => {
