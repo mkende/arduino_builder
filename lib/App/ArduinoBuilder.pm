@@ -19,7 +19,7 @@ use Getopt::Long;
 use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub Run {
   my $project_dir;
