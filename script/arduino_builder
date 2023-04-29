@@ -109,7 +109,7 @@ precedance over any other configuration files that will be read afterward.
 =back
 
 Other standard properties of the Arduino build system,
-L<documented here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#global-predefined-properties,
+L<documented here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#global-predefined-properties>,
 are also implemented and can be used when defining the config of your project.
 
 =head1 CAVEATS
