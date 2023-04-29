@@ -25,12 +25,16 @@ sub Run {
   my $project_dir;
   my $build_dir;
 
+  my $config = App::ArduinoBuilder::Config->new();
+
   my (@skip, @force, @only);
   GetOptions(
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
       'project-dir|project|p=s' => \$project_dir,
       'build-dir|build|b=s' => \$build_dir,
       'log-level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
+      'config|c=s%' => sub { $config->set($_[1] => $_[2], allow_override => 1) },
+      'menu=s%' => sub { $config->set('builder.menu.'.$_[1] => $_[2], allow_override => 1) },
       'skip=s@' => sub { push @skip, split /,/, $_[1] },  # skip this step
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
@@ -47,10 +51,8 @@ sub Run {
     $project_dir = system_cwd();
   }
 
-  my $config = App::ArduinoBuilder::Config->new(
-      files => [catfile($project_dir, 'arduino_builder.local'),
-                catfile($project_dir, 'arduino_builder.config')],
-      allow_missing => 1);
+  $config->read_file(catfile($project_dir, 'arduino_builder.local'), allow_missing => 1);
+  $config->read_file(catfile($project_dir, 'arduino_builder.config'), allow_missing => 1);
 
   $config->set('builder.project_dir' => $project_dir);
 
@@ -62,19 +64,6 @@ sub Run {
     } else {
       fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
     }
-  }
-
-  if (!$config->exists('builder.source.path')) {
-    my $d = first { -d catdir($project_dir, $_) } qw(src srcs source sources);
-    if (defined $d) {
-      $config->set('builder.source.path' => catdir($project_dir, $d));
-      $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
-    } else {
-      $config->set('builder.source.path' => $project_dir);
-      $config->set('builder.source.is_recursive' => 0, ignore_existing => 1);
-    }
-  } else {
-    $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
   }
 
   if ($command eq 'build') {
@@ -104,6 +93,20 @@ sub build {
   my @skip = @{$array_args[0]};
   my @force = @{$array_args[1]};
   my @only = @{$array_args[2]};
+
+  if (!$config->exists('builder.source.path')) {
+    my $project_dir = $config->get('builder.project_dir');
+    my $d = first { -d catdir($project_dir, $_) } qw(src srcs source sources);
+    if (defined $d) {
+      $config->set('builder.source.path' => catdir($project_dir, $d));
+      $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+    } else {
+      $config->set('builder.source.path' => $project_dir);
+      $config->set('builder.source.is_recursive' => 0, ignore_existing => 1);
+    }
+  } else {
+    $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+  }
 
   if (!$config->exists('builder.package.path')) {
     fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
