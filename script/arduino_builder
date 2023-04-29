@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use 5.022;
+use 5.026;
 use strict;
 use warnings;
 use utf8;
@@ -105,6 +105,8 @@ precedance over any other configuration files that will be read afterward.
 =item C<builder.source.is_recursive>
 
 =item C<builder.menu.XXX>
+
+=item C<builder.parallelize>
 
 =back
 

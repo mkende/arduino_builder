@@ -1,6 +1,6 @@
 package App::ArduinoBuilder;
 
-use 5.022;
+use 5.026;
 use strict;
 use warnings;
 use utf8;
@@ -39,7 +39,7 @@ sub Run {
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
-      'j=i' => sub { default_runner()->set_max_parallel_tasks($_[1]) },
+      'j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   fatal "More than one command specified: ".join(' ', @ARGV) if @ARGV > 1;
@@ -226,6 +226,10 @@ sub build {
   # https://arduino.github.io/arduino-cli/0.32/package_index_json-specification/#how-a-tools-path-is-determined-in-platformtxt
 
   full_debug "Complete configuration: \n%s", sub { $config->dump('  ') };
+
+  if ($config->exists('builder.parallelize')) {
+    default_runner()->set_max_parallel_tasks($config->get('builder.parallelize'));
+  }
 
   my $run_step = sub {
     my ($step) = @_;

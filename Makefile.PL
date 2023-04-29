@@ -1,4 +1,4 @@
-use 5.022;
+use 5.026;
 
 use strict;
 use warnings;
@@ -12,7 +12,9 @@ WriteMakefile(
     ABSTRACT         => "Build system for Arduino programs",
     LICENSE          => 'mit',
     EXE_FILES        => ['script/arduino_builder'],
-    MIN_PERL_VERSION => '5.022',
+    # The only requirement on 5.26 are indented here docs in the tests.
+    # Otherwise I believe that everything should work with 5.22
+    MIN_PERL_VERSION => '5.026',
     MAN3PODS         => {},
     CONFIGURE_REQUIRES => {
       'ExtUtils::MakeMaker' => '0',
