@@ -74,6 +74,16 @@ precedance over any other configuration files that will be read afterward.
 
 =item - F<boards.txt> file in the platform package directory.
 
+This file and the previous ones are treated specially: once they are read,
+configuration properties are filtered to keep only thoses prefixed by the name
+of the board specified by the C<builder.package.board> configuration (that is
+expected to be present in the F<arduino_builder.config> file). And that prefix
+is removed from the configuration keys.
+
+After that step, the L</"Menu Resolution"> happens and the resulting
+configuration values will override those read in the F<boards.local.txt> and
+F<boards.txt> files (but not those read in previous files).
+
 =item - F<platform.local.txt> file in the platform package directory.
 
 =item - F<platform.txt> file in the platform package directory.

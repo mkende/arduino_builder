@@ -8,7 +8,8 @@ use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::DepCheck 'check_dep';
 use App::ArduinoBuilder::FilePath 'find_all_files_with_extensions';
-use App::ArduinoBuilder::Logger ':all_logger';
+use App::ArduinoBuilder::Logger;
+use App::ArduinoBuilder::System 'execute_cmd';
 use File::Path 'make_path';
 use File::Spec::Functions 'catfile';
 
@@ -17,19 +18,6 @@ my @supported_source_extensions = qw(c cpp S ino);
 sub new {
   my ($class, $config) = @_;
   return bless {config => $config}, $class;
-}
-
-sub _execute {
-  my ($cmd, %options) = @_;
-  log_cmd $cmd;
-  if (exists $options{capture_output}) {
-    my $out = `${cmd}`;
-    fatal "Can’t execute the following command: $!\n\t${cmd}" unless defined $out;
-    ${$options{capture_output}} = $out;
-  } else {
-    system($cmd) and fatal "Can’t execute the following command: $!\n\t${cmd}";
-  }
-  return 1;
 }
 
 sub _run_recipe_pattern {
@@ -52,7 +40,7 @@ sub _run_recipe_pattern {
     } else {
       fatal "Invalid recipe name: recipe.${recipe_name}.${k}" unless $k =~ m/^(?:\d+\.)?pattern$/;
     }
-    _execute($recipes->get($k, base => $this->{config}, %options), %options);
+    execute_cmd($recipes->get($k, base => $this->{config}, %options), %options);
   }
   return;
 }
@@ -89,7 +77,7 @@ sub _ino_to_cpp {
     # It’s weird but this is not a "pattern" recipe. Why?
     $recipe = $this->{config}->get('recipe.preproc.macros', with => {source_file => "${target}.cpp-pre", preprocessed_file_path => "${target}.cpp"});
   }
-  _execute($recipe);
+  execute_cmd($recipe);
 
   # TODO: there is a step in the real Arduino tool that is badly documented but which uses ctags to extract the
   # prototype of the functions in the .ino files (and adds them at the beginning of the C++ file), so that the
@@ -207,6 +195,8 @@ sub compute_binary_size {
   my ($this) = @_;
   my $output;
   $this->_run_recipe_pattern('size', capture_output => \$output, is_size => 1);
+  # TODO: There is a variant using the 'advanced_size' recipe that can be
+  # implemented for more complex scenario and that we are not yet supporting.
 
   my $bin_size_re = $this->{config}->get('recipe.size.regex', default => undef);
   if ($bin_size_re) {
