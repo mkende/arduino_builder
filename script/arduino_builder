@@ -29,11 +29,47 @@ arduino_builder - Build system for Arduino programs
 
 =head1 SYNOPSIS
 
-  arduino_builder [options] command
+  arduino_builder [options] command ...
 
 =head1 DESCRIPTION
 
+=head1 COMMANDS
+
+=over 4
+
+=item B<clean>
+
+=item B<build>
+
+=back
+
 =head1 OPTIONS
+
+=over 4
+
+=item C<--help>, C<-h>
+
+=item C<--project-dir I<dir>>, C<-p>
+
+=item C<--build-dir I<dir>>, C<-b>
+
+=item C<--log-level I<level>>, C<-l>
+
+=item C<--parallelize I<N>>, C<-j>
+
+=item C<--config I<k=v>>, C<-c>
+
+=item C<--menu I<m=v>>, C<-m>
+
+=item C<--skip I<step>>
+
+=item C<--force I<step>>
+
+=item C<--only I<step>>
+
+=item C<--stack-trace-on-error>, C<--stack>
+
+=back
 
 =head1 CONFIGURATION FILE SYNTAX
 

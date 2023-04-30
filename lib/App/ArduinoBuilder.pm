@@ -39,7 +39,7 @@ sub Run {
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
-      'j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
+      'parallelize|j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   push @ARGV, 'build' unless @ARGV;
