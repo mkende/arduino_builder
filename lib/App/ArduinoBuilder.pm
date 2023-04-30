@@ -42,8 +42,7 @@ sub Run {
       'j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
-  fatal "More than one command specified: ".join(' ', @ARGV) if @ARGV > 1;
-  my $command = @ARGV ? $ARGV[0] : 'build';
+  push @ARGV, 'build' unless @ARGV;
 
   my $project_dir_is_cwd = 0;
   if (!$project_dir) {
@@ -66,12 +65,14 @@ sub Run {
     }
   }
 
-  if ($command eq 'build') {
-    build($config, $build_dir, \@skip, \@force, \@only);
-  } elsif ($command eq 'clean') {
-    clean($config, $build_dir);
-  } else {
-    fatal "Unknown command: ${command}";
+  for my $command (@ARGV) {
+    if ($command eq 'build') {
+      build($config, $build_dir, \@skip, \@force, \@only);
+    } elsif ($command eq 'clean') {
+      clean($config, $build_dir);
+    } else {
+      fatal "Unknown command: ${command}";
+    }
   }
 }
 
