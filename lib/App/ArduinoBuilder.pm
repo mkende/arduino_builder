@@ -108,11 +108,12 @@ sub build {
     $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
   }
 
+  my $arduino_dir = find_arduino_dir();
+
   if (!$config->exists('builder.package.path')) {
     fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
     # TODO: the core package can also be installed in a "hardware" directory in
     # the sketch directory. We should search for it there.
-    my $arduino_dir = find_arduino_dir();
     fatal "The builder.package.path config is not set and Arduino installation directory not found" unless $arduino_dir;
     debug "Using arduino directory: ${arduino_dir}";
     my $package_name = $config->get('builder.package.name');
@@ -201,6 +202,13 @@ sub build {
   $config->set('build.variant.path', catdir($hardware_path, 'variants', $config->get('build.variant')));
 
   my @tools_dirs = (catdir($package_path, 'tools'));
+  if ($arduino_dir) {
+    push @tools_dirs, catdir($arduino_dir, 'packages', 'builtin', 'tools');
+    push @tools_dirs, catdir($arduino_dir, 'packages', 'arduino', 'tools');
+  } else {
+    warning 'The Arduino GUI directory could not be found, we won’t use the builtin tools.';
+  }
+
   for my $tools_dir (@tools_dirs) {
     next unless -d $tools_dir;
     my @tools = list_sub_directories($tools_dir);
@@ -208,9 +216,11 @@ sub build {
       debug "Found tool: $t";
       my $tool_path = catdir($tools_dir, $t);
       my $latest_tool_path = find_latest_revision_dir($tool_path);
-      $config->set("runtime.tools.${t}.path", $latest_tool_path);
+      # That one could point to the latest version found across all packages
+      # instead of the first version (possibly that of "our" package).
+      $config->set("runtime.tools.${t}.path", $latest_tool_path, ignore_existing => 1);
       for my $v (list_sub_directories($tools_dir)) {
-        $config->set("runtime.tools.${t}-${v}.path", catdir($tool_path, $v));
+        $config->set("runtime.tools.${t}-${v}.path", catdir($tool_path, $v), ignore_existing => 1);
       }
     }
   }
