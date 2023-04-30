@@ -20,9 +20,15 @@ sub new {
 }
 
 sub _execute {
-  my ($cmd) = @_;
+  my ($cmd, %options) = @_;
   log_cmd $cmd;
-  system($cmd) and fatal "Can’t execute the following command: $!\n\t${cmd}";
+  if (exists $options{capture_output}) {
+    my $out = `${cmd}`;
+    fatal "Can’t execute the following command: $!\n\t${cmd}" unless defined $out;
+    ${$options{capture_output}} = $out;
+  } else {
+    system($cmd) and fatal "Can’t execute the following command: $!\n\t${cmd}";
+  }
   return 1;
 }
 
@@ -39,9 +45,14 @@ sub _run_recipe_pattern {
   }
   debug "Running %d hook%s for '${recipe_name}", $nb_recipes, ($nb_recipes > 1 ? 's' : '') if $is_hook && $nb_recipes;
   for my $k (sort $recipes->keys()) {
-    fatal "Invalid recipe name: recipe.${recipe_name}.${k}" unless $k =~ m/^(?:\d+\.)?pattern$/ || $options{is_objcopy};
-    fatal "Invalid objcopy recipe name: recipe.${recipe_name}.${k}" if $options{is_objcopy} && $k !~ m/^\w+\.(?:\d+\.)?pattern$/;
-    _execute($recipes->get($k, base => $this->{config}, %options));
+    if ($options{is_objcopy}) {
+      fatal "Invalid objcopy recipe name: recipe.${recipe_name}.${k}" unless $k =~ m/^\w+\.(?:\d+\.)?pattern$/;
+    } elsif ($options{is_size}) {
+     next unless $k =~ m/^(?:\d+\.)?pattern$/;
+    } else {
+      fatal "Invalid recipe name: recipe.${recipe_name}.${k}" unless $k =~ m/^(?:\d+\.)?pattern$/;
+    }
+    _execute($recipes->get($k, base => $this->{config}, %options), %options);
   }
   return;
 }
@@ -189,6 +200,44 @@ sub build_object_files {
 sub link_executable {
   my ($this, $object_files, $archive) = @_;
   $this->_run_recipe_pattern('c.combine', with => {object_files => '"'.join('" "', @{$object_files}).'"', archive_file => $archive, archive_file_path => catfile($this->{config}->get('build.path'), $archive)});
+  return;
+}
+
+sub compute_binary_size {
+  my ($this) = @_;
+  my $output;
+  $this->_run_recipe_pattern('size', capture_output => \$output, is_size => 1);
+
+  my $bin_size_re = $this->{config}->get('recipe.size.regex', default => undef);
+  if ($bin_size_re) {
+    my $bin_size = 0;
+    while ($output =~ m/${bin_size_re}/mg) {
+      $bin_size += $1;
+    }
+    my $max_bin_size = $this->{config}->get('upload.maximum_size', default => undef);
+    if ($max_bin_size) {
+      info '  Sketch uses %d bytes (%d%%) of program space. Maximum is %d bytes.', $bin_size, ($bin_size * 100 / $max_bin_size), $max_bin_size;
+      fatal 'Sketch is too large' if $bin_size > $max_bin_size;
+    } else {
+      info '  Sketch uses %d bytes of program space.', $bin_size;
+    }
+  }
+
+  my $data_size_re =$this->{config}->get('recipe.size.regex.data', default => undef);
+  if ($data_size_re) {
+    my $data_size = 0;
+    while ($output =~ m/${data_size_re}/mg) {
+      $data_size += $1;
+    }
+    my $max_data_size = $this->{config}->get('upload.maximum_data_size', default => undef);
+    if ($max_data_size) {
+      info '  Global varables use %d bytes (%d%%) of dynamic memory, leaving %d bytes for local variables. Maximum is %d bytes.', $data_size, ($data_size * 100 / $max_data_size), ($max_data_size - $data_size), $max_data_size;
+      fatal 'Too much memory used' if $data_size > $max_data_size;
+    } else {
+      info '  Global varables use %d bytes of dynamic memory.', $data_size;
+    }
+  }
+
   return;
 }
 

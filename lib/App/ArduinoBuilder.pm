@@ -292,6 +292,7 @@ sub build {
   # and also the precompiled
   if ($run_step->('libraries')) {
     info 'Building libraries...';
+    $builder->run_hook('libraries.prebuild');
     for my $l (@all_libs) {
       # Todo: we could add "lib-$l" pseudo-steps, but we need to take care of the --only
       # interaction with the 'libraries' step.
@@ -309,6 +310,7 @@ sub build {
       info ($built_lib ? '    Success' : '    Already up-to-date');
       $built_something |= $built_lib;
     }
+    $builder->run_hook('libraries.postbuild');
   }
 
   $config->append('includes', '"-I'.$config->get('builder.source.path').'"');
@@ -353,6 +355,14 @@ sub build {
     info '  Success';
   } else {
     info '  Already up-to-date';
+  }
+
+  info 'Computing binary sketch size';
+  if (($built_something && $run_step->('size')) || $force->('size')) {
+    $builder->compute_binary_size();
+    # Not printing 'Success' here because the command already has an output.
+  } else {
+    info '  No new binary built';
   }
 
   info 'Success!';
