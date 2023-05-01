@@ -399,11 +399,12 @@ sub upload {
   info 'Running board discovery...';
   my $uploader = App::ArduinoBuilder::Uploader->new($config);
   my @ports = $uploader->discover();
+
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
-  my $target = $config->get('builder.upload.port');
-  my $port = first { $_->get('upload.port.label') eq $target || $_->get('upload.port.address') eq $target } @ports;
-  fatal "Port '${target}' cannot be found, can your target be found by the 'discover' command?" unless defined $port;
+  my @targets = split(/\s*,\s*/, $config->get('builder.upload.port'));
+  my $port = first { my $port = $_; any { $port->get('upload.port.label') eq $_ || $port->get('upload.port.address') eq $_ } @targets } @ports;
+  fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets) unless defined $port;
   my $protocol = $port->get('upload.port.protocol');
   my $tool = $config->get("upload.tool.${protocol}", default => $config->get('upload.tool.default', default => $config->get('upload.tool')));
   my $tool_config = $config->filter("tools.${tool}");
