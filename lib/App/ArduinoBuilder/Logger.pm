@@ -5,6 +5,7 @@ use warnings;
 use utf8;
 
 use Carp qw(confess);
+use Data::Dumper;
 use Exporter 'import';
 
 our @EXPORT = qw(fatal error warning info debug full_debug);
@@ -36,10 +37,20 @@ sub _level_to_prefix {
   return 'UNKNOWN';
 }
 
+sub _stringify {
+  my ($s) = @_;
+  $s = $s->() if ref $s eq 'CODE';
+  return $s unless ref $s;
+  local $Data::Dumper::Pad = '    ';
+  local $Data::Dumper::Terse = 1;
+  local $Data::Dumper::Sortkeys = 1;
+  return Dumper($s);
+}
+
 sub _log {
   my ($level, $message, @args) = @_;
   return if $level > $current_level;
-  @args = map { ref eq 'CODE' ? $_->() : $_ } @args;
+  @args = map { _stringify($_) } @args;
   my $msg = sprintf "%s%s${message}\n", _level_to_prefix($level), $prefix, @args;
   if ($level == $LEVEL_FATAL) {
     if ($die_with_stack_trace) {

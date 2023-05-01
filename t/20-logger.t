@@ -14,4 +14,8 @@ ok(no_warnings { debug 'won’t be printer' });
 App::ArduinoBuilder::Logger::set_log_level('DEBUG');
 is(warns { debug 'is printed' } , "DEBUG: is printed\n");
 
+is(warns { debug 'later: %s', sub { "deferred" } } , "DEBUG: later: deferred\n");
+
+is(warns { debug 'dumped: %s', \"ref" } , "DEBUG: later: deferred\n");
+
 done_testing;
