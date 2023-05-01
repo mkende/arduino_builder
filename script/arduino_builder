@@ -41,6 +41,10 @@ arduino_builder - Build system for Arduino programs
 
 =item B<build>
 
+=item B<discover>
+
+=item B<upload>
+
 =back
 
 =head1 OPTIONS
@@ -68,6 +72,8 @@ arduino_builder - Build system for Arduino programs
 =item C<--only I<step>>
 
 =item C<--stack-trace-on-error>, C<--stack>
+
+=item C<--target-port I<port>>, C<--port>
 
 =back
 
@@ -152,13 +158,23 @@ F<boards.txt> files (but not those read in previous files).
 
 =item C<builder.menu.XXX>
 
+=item C<builder.library.XXX>
+
 =item C<builder.parallelize>
+
+=item C<builder.config.append.XXX>
+
+=item C<builder.upload.port>
 
 =back
 
 Other standard properties of the Arduino build system,
 L<documented here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#global-predefined-properties>,
 are also implemented and can be used when defining the config of your project.
+
+=head1 MENU RESOLUTION
+
+=head1 BINARY UPLOAD
 
 =head1 CAVEATS
 
@@ -172,20 +188,42 @@ features are the following ones:
 For now, you have to specify explicitly all the libraries that are used by your
 program as well as where these libraries are installed.
 
+=item Core and libraries download
+
+Arduino Builder can’t (yet) download missing core and libraries. They must all
+be installed on your system before compiling.
+
 =item Pre-compiled libraries
 
 The Arduino GUI can use pre-compiled libraries for closed source code. This is
 not supported yet by this tool.
 
-=item Program size calculation
+=item Core, variant and library reference
 
-The Arduino GUI displays the program size compared to your micro-controller
-flash size.
+The configuration syntax to reference other packages (documented
+L<here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#referencing-another-core-variant-or-tool>)
+is not yet supported.
 
-=item Program upload to micro-controller
+=item Non MS-Windows systems
 
-The Arduino GUI can upload (flash) your program on your micro-controller.
+Only the basic features of the tool have been tested on Linux and, for now, no
+tests have been performed on MacOS. Please report any bug that you encounter
+with these OSs with as much details as you can.
 
+=item Upload verification.
+
+The verification step, documented
+L<here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#upload-verification>,
+is not yet implemented.
+
+Similarly uploads using external programmers and bootloader burning are not
+handled.
+
+=item 1200bps bootloader reset
+
+If the reset to bootloader is not performed by the upload tools used, Arduino
+Builder cannot yet perform this reset itself (documented
+L<here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#1200-bps-bootloader-reset>).
 =back
 
 =head1 AUTHOR

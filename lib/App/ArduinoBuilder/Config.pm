@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use utf8;
 
-use App::ArduinoBuilder::Logger;
+use App::ArduinoBuilder::Logger '!dump';
 use Exporter 'import';
 
 our @EXPORT_OK = qw(get_os_name);
@@ -14,7 +14,7 @@ our @EXPORT_OK = qw(get_os_name);
 
 sub new {
   my ($class, %options) = @_;
-  my $this = bless {config => {}, files => 0, options => {}}, $class;
+  my $this = bless {config => {}, files => 0, options => {%options}}, $class;
   $this->read_file($options{file}, %options) if $options{file};
   for my $f (@{$options{files}}) {
     $this->read_file($f, %options, no_resolve => 1);
@@ -77,6 +77,7 @@ sub get {
   return $options{default} if !$this->exists($key) && exists $options{default};
   $options{allow_partial} = 1 if $options{no_resolve};
   my $v = _resolve_key($key, $this->{config}, %options, allow_partial => 1);
+  return $v if $options{allow_partial};
   fatal "Key '$key' does not exist in the configuration." unless defined $v;
   fatal "Key '$key' has unresolved reference to value '$1'." if $v =~ m/\{([^}]+)\}/ && !$options{allow_partial};
   return $v;
@@ -117,7 +118,7 @@ sub _resolve_key {
   my ($key, $config, %options) = @_;
   return $options{with}{$key} if exists $options{with}{$key};
   if (not exists $config->{$key}) {
-    return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base} && $options{base}->exists($key);
+    return $options{base}->get($key, %options{grep { $_ ne 'base'} CORE::keys %options}) if exists $options{base};
     fatal "Can’t resolve key '${key}' in the configuration." unless $options{allow_partial};
     return;
   }
@@ -177,6 +178,16 @@ sub filter {
     }
   }
   return $filtered;
+}
+
+sub prefix {
+  my ($this, $prefix) = @_;
+  my $prefixed = App::ArduinoBuilder::Config->new();
+  $prefixed->{options}{base} = $this;
+  while (my ($k, $v) = each %{$this->{config}}) {
+    $prefixed->{config}{$prefix.'.'.$k} = $v;
+  }
+  return $prefixed;
 }
 
 sub dump {

@@ -9,7 +9,7 @@ use App::ArduinoBuilder::Config;
 use FindBin;
 
 sub new {
-  return App::ArduinoBuilder::Config->new();
+  return App::ArduinoBuilder::Config->new(@_);
 }
 
 my $simple_config_path = "${FindBin::Bin}/data/simple_config.txt";
@@ -74,6 +74,16 @@ is($config->filter('test')->dump(), <<~EOF);
     b.c=2
     b.d=3
     EOF
+}
+
+{
+  my $a = new();
+  my $b = new(base => $a);
+  my $c = new(base => $b);
+  $a->set(a => 1);
+  $b->set(b => '{a}2');
+  $c->set(c => '{a}{b}3');
+  is ($c->get('c'), '1123');
 }
 
 like(dies { new()->parse_perl({a => [qw(1 2)]})}, qr/"ARRAY"/);

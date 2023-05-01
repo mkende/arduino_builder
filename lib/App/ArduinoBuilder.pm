@@ -10,7 +10,8 @@ use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
-use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd';
+use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd', 'execute_cmd';
+use App::ArduinoBuilder::Uploader;
 
 use File::Basename;
 use File::Path 'remove_tree';
@@ -40,6 +41,7 @@ sub Run {
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
       'parallelize|j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
+      'target-port|port=s' => sub { $config->set('builder.upload.port' => $_[1], allow_override => 1)},
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   push @ARGV, 'build' unless @ARGV;
@@ -64,36 +66,27 @@ sub Run {
       fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
     }
   }
+  $config->set('build.path' => $build_dir);
+
+  generate_project_config($config);
 
   for my $command (@ARGV) {
     if ($command eq 'build') {
-      build($config, $build_dir, \@skip, \@force, \@only);
+      build($config, \@skip, \@force, \@only);
     } elsif ($command eq 'clean') {
       clean($config, $build_dir);
+    } elsif ($command eq 'upload') {
+      upload($config);
+    } elsif ($command eq 'discover') {
+      discover($config);
     } else {
       fatal "Unknown command: ${command}";
     }
   }
 }
 
-sub clean {
-  my ($config, $build_dir) = @_;
-
-  # TODO: add a way to clean only parts of the projects.
-  if ($build_dir eq $config->get('builder.default_build_dir')) {
-    remove_tree($build_dir, {safe => 1, keep_root => 1});
-  } else {
-    warning "For safety reason we can only clean build directory specified in the project";
-    warning "config. You should run `rm -rf` manually.";
-    fatal "Not cleaning context dependent directory: ${build_dir}";
-  }
-}
-
-sub build {
-  my ($config, $build_dir, @array_args) = @_;
-  my @skip = @{$array_args[0]};
-  my @force = @{$array_args[1]};
-  my @only = @{$array_args[2]};
+sub generate_project_config {
+  my ($config) = @_;
 
   if (!$config->exists('builder.source.path')) {
     my $project_dir = $config->get('builder.project_dir');
@@ -195,7 +188,6 @@ sub build {
   # todo: name, _id, build.fqbn, and the time options
   $config->set('build.source.path' => $config->get('builder.source.path'));
   $config->set('sketch_path' => $config->get('builder.source.path'));
-  $config->set('build.path' => $build_dir);
   $config->set('build.project_name' => $config->get('builder.project_name'));
   $config->set('build.arch' => uc($config->get('builder.package.arch')));  # Undocumented but it seems that it’s always upper case.
   $config->set('build.core.path', catdir($hardware_path, 'cores', $config->get('build.core')));
@@ -242,6 +234,28 @@ sub build {
     default_runner()->set_max_parallel_tasks($config->get('builder.parallelize'));
   }
 
+  return 1;
+}
+
+sub clean {
+  my ($config, $build_dir) = @_;
+
+  # TODO: add a way to clean only parts of the projects.
+  if ($build_dir eq $config->get('builder.default_build_dir')) {
+    remove_tree($build_dir, {safe => 1, keep_root => 1});
+  } else {
+    warning "For safety reason we can only clean build directory specified in the project";
+    warning "config. You should run `rm -rf` manually.";
+    fatal "Not cleaning context dependent directory: ${build_dir}";
+  }
+}
+
+sub build {
+  my ($config, @array_args) = @_;
+  my @skip = @{$array_args[0]};
+  my @force = @{$array_args[1]};
+  my @only = @{$array_args[2]};
+
   my $run_step = sub {
     my ($step) = @_;
     return (none { $_ eq $step } @skip) && (!@only || any { $_ eq $step } @only);
@@ -267,7 +281,7 @@ sub build {
   if ($run_step->('core')) {
     info 'Building core...';
     $builder->run_hook('core.prebuild');
-    my $built_core = $builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($build_dir, 'core'), 'core.a', $force->('core'));
+    my $built_core = $builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($config->get('build.path'), 'core'), 'core.a', $force->('core'));
     info ($built_core ? '  Success' : '  Already up-to-date');
     $built_something |= $built_core;
     $builder->run_hook('core.postbuild');
@@ -309,7 +323,7 @@ sub build {
       # interaction with the 'libraries' step.
       info '  Building library %s...', $lib_config->get("${l}.name");
       my $base_dir = $lib_config->get($l);
-      my $output_dir = catdir($build_dir, 'libs', $l);
+      my $output_dir = catdir($config->get('build.path'), 'libs', $l);
       my $built_lib;
       if ($lib_config->get("${l}.is_flat")) {
         my $utility_dir = catdir($base_dir, 'utility');
@@ -332,7 +346,7 @@ sub build {
     # TODO: add configuration option for the ignored directories and also a way to
     # build only the code inside the src/ directory
     my $built_sketch = $builder->build_object_files(
-        $config->get('builder.source.path'), catdir($build_dir, 'sketch'),
+        $config->get('builder.source.path'), catdir($config->get('build.path'), 'sketch'),
         [], $force->('sketch'), $config->get('builder.source.is_recursive'));
     info ($built_sketch ? '  Success' : '  Already up-to-date');
     $built_something |= $built_sketch;
@@ -341,9 +355,9 @@ sub build {
   # Bug: there is a similar bug to the one in build_archive: if a source file is
   # removed, we won’t remove it’s object file. I guess we could try to detect it.
   # Meanwhile it’s probably acceptable to ask for a cleanup from time to time.
-  my @object_files = find_all_files_with_extensions(catdir($build_dir, 'sketch'), ['o']);
+  my @object_files = find_all_files_with_extensions(catdir($config->get('build.path'), 'sketch'), ['o']);
   for my $l (@all_libs) {
-    push @object_files, find_all_files_with_extensions(catdir($build_dir, 'libs', $l), ['o']);
+    push @object_files, find_all_files_with_extensions(catdir($config->get('build.path'), 'libs', $l), ['o']);
   }
   debug 'Object files: '.join(', ', @object_files);
 
@@ -378,5 +392,56 @@ sub build {
 
   info 'Success!';
 }
+
+sub upload {
+  my ($config) = @_;
+
+  info 'Running board discovery...';
+  my $uploader = App::ArduinoBuilder::Uploader->new($config);
+  my @ports = $uploader->discover();
+  # TODO: implement an exact match selection and an interactive selection.
+  fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
+  my $target = $config->get('builder.upload.port');
+  my $port = first { $_->get('upload.port.label') eq $target || $_->get('upload.port.address') eq $target } @ports;
+  fatal "Port '${target}' cannot be found, can your target be found by the 'discover' command?" unless defined $port;
+  my $protocol = $port->get('upload.port.protocol');
+  my $tool = $config->get("upload.tool.${protocol}", default => $config->get('upload.tool.default', default => $config->get('upload.tool')));
+  my $tool_config = $config->filter("tools.${tool}");
+
+  # TODO: add a way to set the verbose mode, in which case the upload.params.verbose
+  # property should be copied, instead of upload.params.quiet.
+  # Reference: https://arduino.github.io/arduino-cli/0.32/platform-specification/#verbose-parameter
+  $tool_config->set('upload.verbose' => $tool_config->get('upload.params.quiet'), allow_override => 1);
+
+  my $upload_config = $config->filter("upload.${protocol}")->prefix('upload');
+  $upload_config->merge($tool_config);
+  $upload_config->merge($port);
+  # Note: $config is in the recursive base in $upload_config.
+
+  # TODO: Before executing the command, some boards require that we manually
+  # reset them through their Serial port.
+  # See the code: https://github.com/arduino/arduino-cli/blob/ad9ddb882016c2af10e0db3785a46122bc9cfb1f/commands/upload/upload.go#L370
+  # And the doc: https://arduino.github.io/arduino-cli/0.32/platform-specification/#1200-bps-bootloader-reset
+
+  my $cmd = $upload_config->get('upload.pattern');
+  debug "Upload configuration:\n%s", sub { $upload_config->dump('  ') };
+  default_runner()->run_forked(sub {
+        close STDIN;
+        execute_cmd($cmd);
+      });
+
+  info 'Success!';
+
+}
+
+sub discover {
+  my ($config) = @_;
+
+  info 'Running board discovery. Be sure to run with "-l debug"...';
+  my $uploader = App::ArduinoBuilder::Uploader->new($config);
+  $uploader->discover();
+  info 'Success!';
+}
+
 
 1;
