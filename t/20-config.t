@@ -66,6 +66,18 @@ is($config->filter('test')->dump(), <<~EOF);
   is ($filtered->get('a'), '2');
 }
 
+{
+  my $c = new();
+  $c->parse_perl({a => '1', b => {c => 2, d => 3}});
+  is($c->dump(), <<~EOF);
+    a=1
+    b.c=2
+    b.d=3
+    EOF
+}
+
+like(dies { new()->parse_perl({a => [qw(1 2)]})}, qr/"ARRAY"/);
+
 is(App::ArduinoBuilder::Config->new(files=>[$simple_config_path], resolve => 1, allow_partial => 1)->dump(), $simple_config_resolved);
 
 # todo: merge, read_file override order, size, empty, nested variables in replacements or variable inside braces that are not variables

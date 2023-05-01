@@ -38,6 +38,24 @@ sub read_file {
   return 1;
 }
 
+# Parses a Perl data-structure into this objet.
+# $data should be an hash-ref.
+sub parse_perl {
+  my ($this, $data, %options) = @_;
+
+  fatal 'Can’t parse non hash-ref data: "%s"', ref($data) unless ref($data) eq 'HASH';
+  while (my ($k, $v) = each %{$data}) {
+    my $key = exists $options{prefix} ? $options{prefix}.'.'.$k : $k;
+    if (ref $v) {
+      $this->parse_perl($v, %options, prefix => $key);
+    } else {
+      $this->set($key => $v, %options);
+    }
+  }
+
+  return 1;
+}
+
 sub size {
   my ($this) = @_;
   return scalar keys %{$this->{config}};
