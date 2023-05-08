@@ -76,8 +76,11 @@ sub new {
     <$fi>;
   });
   close $fi;
+  is ($task->running(), T());
   like(dies { $task->data() }, qr/still running task/);
-  print $fo "ignored\n";
+  close $fo;
+  $task->wait();
+  is ($task->running(), F());
 }
 
 done_testing;
