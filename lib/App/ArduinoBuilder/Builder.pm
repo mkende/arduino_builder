@@ -134,9 +134,8 @@ package ObjectNameBuilder {
 sub build_archive {
   my ($this, $source_dirs, $target_dir, $archive, $force) = @_;
   make_path($target_dir);
-  my $did_something = 0;
   my $obj_name = ObjectNameBuilder->new($target_dir);
-  my @objects;
+  my @tasks;
   for my $d (@{$source_dirs}) {
     # BUG: There is still a bug here (and in build_object_files) which is that if a file is removed
     # from the sources and there is another file with the same basename, we will do weird things
@@ -145,19 +144,26 @@ sub build_archive {
     my @sources = sort (find_all_files_with_extensions($d, [@supported_source_extensions]));
     for my $s (@sources) {
       my $object_file = $obj_name->object_for($s);
-      if ($force || check_dep($s, $object_file)) {
-        push @objects, $object_file;
-        $did_something = 1;
-        default_runner()->execute(
-          sub {
-            $this->build_file($s, $object_file);
-          });
-      }
+      # This line can be commented and the one inside the sub-task can be
+      # uncommented to execute the dependency check inside the forked process.
+      # However this does not seem to improve the execution speed.
+      next unless $force || check_dep($s, $object_file);
+      push @tasks, default_runner()->execute(
+        sub {
+          # return unless $force || check_dep($s, $object_file);
+          $this->build_file($s, $object_file);
+          return $object_file;
+        });
     }
   }
   default_runner->wait();
-  for my $o (@objects) {
-    $this->_add_to_archive($o, $archive);
+  my $did_something;
+  for my $t (@tasks) {
+    my $o = $t->data();
+    if ($o) {
+      $this->_add_to_archive($o, $archive);
+      $did_something = 1;
+    }
   }
   return $did_something;
 }
@@ -169,20 +175,26 @@ sub build_object_files {
   my ($this, $source_dir, $target_dir, $excluded_dirs, $force, $no_recurse) = @_;
   make_path($target_dir);
   my @sources = sort (find_all_files_with_extensions($source_dir, [@supported_source_extensions], $excluded_dirs, $no_recurse));
-  my $did_something = 0;
   my $obj_name = ObjectNameBuilder->new($target_dir);
+  my @tasks;
   for my $s (@sources) {
     my $object_file = $obj_name->object_for($s);
-    if ($force || check_dep($s, $object_file)) {
-      $did_something = 1;
-      default_runner()->execute(
-        sub {
-          $this->build_file($s, $object_file);
-        });
-    }
+    next unless $force || check_dep($s, $object_file);
+    push @tasks, default_runner()->execute(
+      sub {
+        # return unless $force || check_dep($s, $object_file);
+        $this->build_file($s, $object_file);
+        return 1;
+      });
   }
   default_runner->wait();
-  return $did_something;
+  for my $t (@tasks) {
+    my $o = $t->data();
+    if ($o) {
+      return 1;
+    }
+  }
+  return 0;
 }
 
 sub link_executable {
