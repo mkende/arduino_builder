@@ -45,6 +45,7 @@ sub _stringify {
   local $Data::Dumper::Pad = '    ';
   local $Data::Dumper::Terse = 1;
   local $Data::Dumper::Sortkeys = 1;
+  local $Data::Dumper::Sparseseen = 1;
   return Dumper($s);
 }
 
@@ -56,6 +57,7 @@ sub _stringify_short {
   local $Data::Dumper::Pad = '';
   local $Data::Dumper::Terse = 1;
   local $Data::Dumper::Sortkeys = 1;
+  local $Data::Dumper::Sparseseen = 1;
   return Dumper($s);
 }
 

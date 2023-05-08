@@ -46,4 +46,34 @@ sub new {
   is($r, "test\n");
 }
 
+{
+  my $data = new()->run_forked(sub {
+    return 'test';
+  });
+  is($data, 'test');
+}
+
+{
+  my @data = new()->run_forked(sub {
+    return qw(1 2 3);
+  });
+  is(\@data, [qw(1 2 3)]);
+}
+
+
+{
+  my $task = new()->execute(sub {
+    return 'test';
+  });
+  $task->wait();
+  is($task->data(), 'test');
+}
+
+{
+  my $task = new()->execute(sub {
+    sleep 30;
+  });
+  like(dies { $task->data() }, qr/still running task/);
+}
+
 done_testing;
