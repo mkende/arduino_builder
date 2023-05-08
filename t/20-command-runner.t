@@ -70,10 +70,14 @@ sub new {
 }
 
 {
+  pipe my $fi, my $fo;  # from parent to child
   my $task = new()->execute(sub {
-    sleep 30;
+    close $fo;
+    <$fi>;
   });
+  close $fi;
   like(dies { $task->data() }, qr/still running task/);
+  print $fo "ignored\n";
 }
 
 done_testing;
