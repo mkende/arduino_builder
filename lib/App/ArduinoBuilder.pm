@@ -23,16 +23,13 @@ use Pod::Usage;
 our $VERSION = '0.06';
 
 sub Run {
-  my $project_dir;
-  my $build_dir;
-
   my $config = App::ArduinoBuilder::Config->new();
 
   my (@skip, @force, @only);
   GetOptions(
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
-      'project-dir|project|p=s' => \$project_dir,
-      'build-dir|build|b=s' => \$build_dir,
+      'project-dir|project|p=s' => sub { $config->set('builder.project_dir' => $_[1], allow_override => 1) },
+      'build-dir|build|b=s' => sub { $config->set('builder.internal.build_dir' => $_[1], allow_override => 1) },
       'log-level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
       'config|c=s%' => sub { $config->set($_[1] => $_[2], allow_override => 1) },
       'menu=s%' => sub { $config->set('builder.menu.'.$_[1] => $_[2], allow_override => 1) },
@@ -44,52 +41,59 @@ sub Run {
       'target-port|port=s' => sub { $config->set('builder.upload.port' => $_[1], allow_override => 1)},
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
-  push @ARGV, 'build' unless @ARGV;
-
-  my $project_dir_is_cwd = 0;
-  if (!$project_dir) {
-    $project_dir_is_cwd = 1;
-    $project_dir = system_cwd();
+  if (my @unknown = grep { !/^(clean|build|discover|upload)$/ } @ARGV) {
+    fatal "Unknown command%s: %s", (@unknown > 1 ? 's' : ''), join(', ', @unknown);
   }
-
-  $config->read_file(catfile($project_dir, 'arduino_builder.local'), allow_missing => 1);
-  $config->read_file(catfile($project_dir, 'arduino_builder.config'), allow_missing => 1);
-
-  $config->set('builder.project_dir' => $project_dir);
-
-  if (!$build_dir) {
-    if ($config->exists('builder.default_build_dir')) {
-      $build_dir = $config->get('builder.default_build_dir');
-    } elsif (!$project_dir_is_cwd) {
-      $build_dir = system_cwd();
-    } else {
-      fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
-    }
-  }
-  $config->set('build.path' => $build_dir);
 
   generate_project_config($config);
 
-  for my $command (@ARGV) {
-    if ($command eq 'build') {
-      build($config, \@skip, \@force, \@only);
-    } elsif ($command eq 'clean') {
-      clean($config, $build_dir);
-    } elsif ($command eq 'upload') {
-      upload($config);
-    } elsif ($command eq 'discover') {
-      discover($config);
-    } else {
-      fatal "Unknown command: ${command}";
-    }
+  push @ARGV, 'build' unless @ARGV;
+
+  if (grep { /^clean$/ } @ARGV) {
+    clean($config);
+  }
+  if (grep { /^build$/ } @ARGV) {
+    build($config, \@skip, \@force, \@only);
+  }
+  if (grep { /^(discover|upload)$/ } @ARGV) {
+    discover($config);
+  }
+  if (grep { /^upload$/ } @ARGV) {
+    upload($config);
   }
 }
 
 sub generate_project_config {
   my ($config) = @_;
 
+  my $project_dir_is_cwd = 0;
+  my $project_dir;
+  if (!$config->exists('builder.project_dir')) {
+    $project_dir_is_cwd = 1;
+    $project_dir = system_cwd();
+    $config->set('builder.project_dir' => $project_dir);
+  } else {
+    $project_dir = $config->get('builder.project_dir');
+  }
+
+  $config->read_file(catfile($project_dir, 'arduino_builder.local'), allow_missing => 1);
+  $config->read_file(catfile($project_dir, 'arduino_builder.config'), allow_missing => 1);
+
+  my $build_dir;
+  if (!$config->exists('builder.internal.build_dir')) {
+    if ($config->exists('builder.default_build_dir')) {
+      $build_dir = $config->get('builder.default_build_dir');
+      $config->set('builder.internal.build_dir_from_default' => 1);
+    } elsif (!$project_dir_is_cwd) {
+      $build_dir = system_cwd();
+    } else {
+      fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
+    }
+    $config->set('builder.internal.build_dir' => $build_dir);
+  }
+  $config->set('build.path' => $config->get('builder.internal.build_dir'));
+
   if (!$config->exists('builder.source.path')) {
-    my $project_dir = $config->get('builder.project_dir');
     my $d = first { -d catdir($project_dir, $_) } qw(src srcs source sources);
     if (defined $d) {
       $config->set('builder.source.path' => catdir($project_dir, $d));
@@ -238,10 +242,11 @@ sub generate_project_config {
 }
 
 sub clean {
-  my ($config, $build_dir) = @_;
+  my ($config) = @_;
 
   # TODO: add a way to clean only parts of the projects.
-  if ($build_dir eq $config->get('builder.default_build_dir')) {
+  my $build_dir = $config->get('builder.internal.build_dir');
+  if ($config->get('builder.internal.build_dir_from_default', default => 0)) {
     remove_tree($build_dir, {safe => 1, keep_root => 1});
   } else {
     warning "For safety reason we can only clean build directory specified in the project";
@@ -396,10 +401,9 @@ sub build {
 sub upload {
   my ($config) = @_;
 
-  info 'Running board discovery...';
-  my $uploader = App::ArduinoBuilder::Uploader->new($config);
-  my @ports = $uploader->discover();
+  info 'Uploading binary to the board...';
 
+  my @ports = @{$config->get('builder.internal.ports')};
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
   my @targets = split(/\s*,\s*/, $config->get('builder.upload.port'));
@@ -438,9 +442,10 @@ sub upload {
 sub discover {
   my ($config) = @_;
 
-  info 'Running board discovery. Be sure to run with "-l debug"...';
+  info 'Running board discovery. Be sure to run with "-l debug" to see the result...';
   my $uploader = App::ArduinoBuilder::Uploader->new($config);
-  $uploader->discover();
+  my @ports = $uploader->discover();
+  $config->set('builder.internal.ports' => \@ports);
   info 'Success!';
 }
 

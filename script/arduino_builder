@@ -35,15 +35,42 @@ arduino_builder - Build system for Arduino programs
 
 =head1 COMMANDS
 
+The following commands can be passed to the tool. If several commands are
+present, they will all be executed in the order in which they are listed below
+(not in the order in which they are passed). Passing a command more than once
+has no effect.
+
 =over 4
 
 =item B<clean>
 
+Clean the content of the build directory (without removing the build directory
+itself). This command can be used only if the C<builder.default_build_directory>
+configuration value is set in the project config. Otherwise, you should manually
+run the C<rm -fr directory> command.
+
 =item B<build>
+
+Build the project and all its dependencies (Arduino core and libraries).
+
+The command tries to not rebuild unecessary parts of the binary and of its
+dependencies if their sources have not changed. In some circumstance we may not
+detect correctly all dependencies so it may be useful to run the B<clean>
+command (in particular if you have deleted a source file).
 
 =item B<discover>
 
+Run the board discovery to detect your board. This command is implied by the
+B<upload> command.
+
 =item B<upload>
+
+Upload the compiled binary to your board. If the B<build> command the binary
+must already exist and no new version will be compiled before the upload.
+
+Note that the end of the compilation phase will report whether your binary can
+hold in your board memory (and will abort the program if not) but the B<upload>
+command itself does not perform such a check.
 
 =back
 
@@ -138,6 +165,13 @@ F<boards.txt> files (but not those read in previous files).
 
 =head1 CONFIGURATION VALUES
 
+Note that all paths set in configuration values must be absolute path (they will
+not be interpreted as relative path to the config file for example). However you
+can make these paths be relative by using another configuration value to provide
+the absolute part. For example:
+
+  builder.default_build_dir={builder.project_dir}/_build
+
 =over 4
 
 =item C<builder.project_name>
@@ -166,6 +200,14 @@ F<boards.txt> files (but not those read in previous files).
 
 =item C<builder.upload.port>
 
+=item C<builder.project_dir>
+
+The path to the root directory of the project (typically the directory that
+contains the F<arduino_builder.config> file). In general, you should not set
+this value and it will be set automatically. However this value is commonly used
+as part of other values to defines paths relative to your project directory (see
+the example at the top of this section).
+
 =back
 
 Other standard properties of the Arduino build system,
@@ -175,6 +217,14 @@ are also implemented and can be used when defining the config of your project.
 =head1 MENU RESOLUTION
 
 =head1 BINARY UPLOAD
+
+=head1 ENVIRONMENT VARIABLES
+
+=over 4
+
+=item C<ARDUINO_BUILDER_LOG_LEVEL>
+
+=back
 
 =head1 CAVEATS
 
@@ -210,7 +260,13 @@ Only the basic features of the tool have been tested on Linux and, for now, no
 tests have been performed on MacOS. Please report any bug that you encounter
 with these OSs with as much details as you can.
 
-=item Upload verification.
+=item Automatic board detection
+
+There are some mechanism in the Arduino software to identify a connected board.
+For now we require that the user specifies the port used to communicate with the
+board.
+
+=item Upload verification
 
 The verification step, documented
 L<here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#upload-verification>,
