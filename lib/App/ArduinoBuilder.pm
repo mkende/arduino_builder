@@ -8,10 +8,10 @@ use utf8;
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
 use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
+use App::ArduinoBuilder::Discovery;
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd', 'execute_cmd';
-use App::ArduinoBuilder::Uploader;
 
 use File::Basename;
 use File::Path 'remove_tree';
@@ -106,7 +106,12 @@ sub generate_project_config {
     $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
   }
 
-  my $arduino_dir = find_arduino_dir();
+  my $arduino_dir;
+  if ($config->exists('builder.arduino.install_dir')) {
+    $arduino_dir = $config->get('builder.arduino.install_dir');
+  } else {
+    $arduino_dir = find_arduino_dir();
+  }
 
   if (!$config->exists('builder.package.path')) {
     fatal 'At least one of builder.package.path or builder.package.name must be specified in the config' unless $config->exists('builder.package.name');
@@ -398,10 +403,22 @@ sub build {
   info 'Success!';
 }
 
-sub upload {
+sub discover {
   my ($config) = @_;
 
-  info 'Uploading binary to the board...';
+  info 'Running board discovery. Be sure to run with "-l debug" to see the result...';
+  my @ports = App::ArduinoBuilder::Discovery::discover($config);
+  $config->set('builder.internal.ports' => \@ports);
+  info 'Success!';
+}
+
+sub select_port {
+  my ($config) = @_;
+
+  {
+    my $port = $config->get('builder.internal.selected_port', default => undef);
+    return $port if defined $port;
+  }
 
   my @ports = @{$config->get('builder.internal.ports')};
   # TODO: implement an exact match selection and an interactive selection.
@@ -409,6 +426,17 @@ sub upload {
   my @targets = split(/\s*,\s*/, $config->get('builder.upload.port'));
   my $port = first { my $port = $_; any { $port->get('upload.port.label') eq $_ || $port->get('upload.port.address') eq $_ } @targets } @ports;
   fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets) unless defined $port;
+
+  $config->set('builder.internal.selected_port' => $port);
+  return $port;
+}
+
+sub upload {
+  my ($config) = @_;
+
+  info 'Uploading binary to the board...';
+
+  my $port = select_port($config);
   my $protocol = $port->get('upload.port.protocol');
   my $tool = $config->get("upload.tool.${protocol}", default => $config->get('upload.tool.default', default => $config->get('upload.tool')));
   my $tool_config = $config->filter("tools.${tool}");
@@ -438,16 +466,5 @@ sub upload {
   info 'Success!';
 
 }
-
-sub discover {
-  my ($config) = @_;
-
-  info 'Running board discovery. Be sure to run with "-l debug" to see the result...';
-  my $uploader = App::ArduinoBuilder::Uploader->new($config);
-  my @ports = $uploader->discover();
-  $config->set('builder.internal.ports' => \@ports);
-  info 'Success!';
-}
-
 
 1;

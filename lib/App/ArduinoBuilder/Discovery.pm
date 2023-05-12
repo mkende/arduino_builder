@@ -1,4 +1,4 @@
-package App::ArduinoBuilder::Uploader;
+package App::ArduinoBuilder::Discovery;
 
 use strict;
 use warnings;
@@ -6,21 +6,15 @@ use utf8;
 
 use App::ArduinoBuilder::Config;
 use App::ArduinoBuilder::Logger ':all_logger';
-use App::ArduinoBuilder::System 'execute_cmd';
 use File::Spec::Functions;
 use IPC::Open2;
 use JSON::PP;
 use Time::HiRes 'usleep';
 
-sub new {
-  my ($class, $config) = @_;
-  return bless {config => $config}, $class;
-}
-
 # Specification of the discovery protocol.
 # https://arduino.github.io/arduino-cli/0.32/pluggable-discovery-specification/
 sub _run_one_discovery {
-  my ($this, $toolname, $cmd) = @_;
+  my ($toolname, $cmd) = @_;
 
   # Let’s just hope that we don’t have running CommandRunner tasks...
   # Otherwise we could have an actual handler that redirec to the CommandRunner
@@ -62,9 +56,9 @@ sub _run_one_discovery {
 
 # See: https://arduino.github.io/arduino-cli/0.32/platform-specification/#properties-from-pluggable-discovery
 sub _port_to_config {
-  my ($this, $port) = @_;
+  my ($config, $port) = @_;
 
-  my $port_config = App::ArduinoBuilder::Config->new(base => $this->{config});
+  my $port_config = App::ArduinoBuilder::Config->new(base => $config);
   $port_config->parse_perl($port, prefix => 'upload.port');
   if ($port_config->exists('upload.port.address')) {
     $port_config->set('serial.port' => $port_config->get('upload.port.address'));
@@ -79,8 +73,8 @@ sub _port_to_config {
 # For _some_ documentation, see:
 # https://arduino.github.io/arduino-cli/0.32/platform-specification/#pluggable-discovery
 sub discover {
-  my ($this) = @_;
-  my $discovery_config = $this->{config}->filter('pluggable_discovery');
+  my ($config) = @_;
+  my $discovery_config = $config->filter('pluggable_discovery');
   if ($discovery_config->filter('required')->empty()) {
     $discovery_config->set('required.0' => 'builtin:serial-discovery');
     $discovery_config->set('required.1' => 'builtin:mdns-discovery');
@@ -94,19 +88,20 @@ sub discover {
   my @discovered_ports;
   for my $k ($discovery_config->keys()) {
     if ($k =~ m/^(.*)\.pattern$/) {
-      push @discovered_ports, $this->_run_one_discovery($1, $discovery_config->get($k));
+      push @discovered_ports, _run_one_discovery($1, $discovery_config->get($k));
     } elsif ($k =~ m/required(?:\.\d+)?/) {
       if ($discovery_config->get($k) =~ m/^([^:]+):(.*)$/) {
+        # Note: for now we’re ignoring the vendor ID part.
         my $tool = $2;
         my $tool_key = "runtime.tools.${tool}.path";
-        if (!$this->{config}->exists($tool_key)) {
+        if (!$config->exists($tool_key)) {
           error "Pluggable discovery references unknown tool: ${tool}";
           next;
         }
-        my $tool_dir = $this->{config}->get($tool_key);
+        my $tool_dir = $config->get($tool_key);
         my $cmd = catfile($tool_dir, $tool);
         $cmd .= '.exe' if $^O eq 'MSWin32';
-        push @discovered_ports, $this->_run_one_discovery($tool, $cmd);
+        push @discovered_ports, _run_one_discovery($tool, $cmd);
       } else {
         error "Invalid pluggable discovery reference format: %s", $discovery_config->get($k);
       }
@@ -115,7 +110,7 @@ sub discover {
     }
   }
 
-  return map { $this->_port_to_config($_) } @discovered_ports;
+  return map { _port_to_config($config, $_) } @discovered_ports;
 }
 
 1;
