@@ -27,6 +27,11 @@ package App::ArduinoBuilder::CommandRunner::Task {
   sub data {
     my ($this) = @_;
     fatal "Trying to read the data of a still running task" if $this->running();
+    # TODO: we should have a variant for undef wantarray that does not setup
+    # the whole pipe to get the return data.
+    # Note: wantarray here is not necessarily the same as when the task was set
+    # up, it is the responsibility of the caller to set the 'scalar' option
+    # correctly.
     return wantarray ? @{$this->{data}} : $this->{data}[0];
   }
 
@@ -126,6 +131,8 @@ sub _fork_and_run {
     # This is used to not finish the task before the children data-structure
     # was written by the parent (in which case our SIGCHLD handler could not
     # correctly track this task).
+    # Ideally this should be done before running the sub, in case it never
+    # returns (call exec) but, in practice it probably does not matter.
     scalar(<$tracker_i>);
     close $tracker_i;
     full_debug "Exiting child task (id == ${task_id}) in process ${$}";
@@ -166,7 +173,9 @@ sub run_forked {
 sub execute {
   my ($this, $sub, %options) = @_;
   %options = (%{$this}, %options);
-  usleep(1000) until $this->{current_tasks} < $this->{max_parallel_tasks};
+  if (!$options{forced}) {
+    usleep(1000) until $this->{current_tasks} < $this->{max_parallel_tasks};
+  }
   return $this->_fork_and_run($sub, %options);
 }
 

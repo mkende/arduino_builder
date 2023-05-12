@@ -83,4 +83,19 @@ sub new {
   is ($task->running(), F());
 }
 
+{
+  pipe my $fi, my $fo;  # from parent to child
+  # This never returns, but the task is still processed correctly.
+  my $task = new()->execute(sub {
+    close $fo;
+    <$fi>;
+    exec $^X, '-e', 'use Time::HiRes "usleep"; usleep(1000)';
+  });
+  close $fi;
+  is ($task->running(), T());
+  close $fo;
+  $task->wait();
+  is ($task->running(), F());
+}
+
 done_testing;
