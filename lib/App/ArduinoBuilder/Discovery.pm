@@ -29,7 +29,9 @@ sub _run_one_discovery {
   my ($toolname, $cmd) = @_;
 
   my $tool = App::ArduinoBuilder::JsonTool->new($cmd);
-  _fail_invalid_response($tool->send("HELLO 1 \"App::ArduinoBuilder 1.0.0\"\n"), 'hello', $toolname);
+  # TODO: we could test that the tool accept to speak the protocol version 1.
+  # But, as there are no other versions for know, it’s somehow an overkill.
+  _fail_invalid_response($tool->send("HELLO 1 ${App::ArduinoBuilder::TOOLS_USER_AGENT}\n"), 'hello', $toolname);
   _fail_invalid_response($tool->send("START\n"), 'start', $toolname);
   my $res = $tool->send("LIST\n");
   _fail_invalid_response($tool->send("QUIT\n"), 'quit', $toolname);
