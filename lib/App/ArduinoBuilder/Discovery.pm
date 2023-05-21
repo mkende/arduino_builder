@@ -5,53 +5,39 @@ use warnings;
 use utf8;
 
 use App::ArduinoBuilder::Config;
+use App::ArduinoBuilder::JsonTool;
 use App::ArduinoBuilder::Logger ':all_logger';
 use File::Spec::Functions;
-use IPC::Open2;
-use JSON::PP;
-use Time::HiRes 'usleep';
+
+
+sub _test_command_response {
+  my ($res, $cmd) = @_;
+  return 0 if $res->{eventType} ne $cmd;
+  return 0 if $res->{message} ne 'OK';
+  return 1;
+}
+
+sub _fail_invalid_response {
+  my ($res, $cmd, $tool) = @_;
+  return if _test_command_response($res, $cmd);
+  fatal "Invalid response for ${tool}:\n%s", $res;
+}
 
 # Specification of the discovery protocol.
 # https://arduino.github.io/arduino-cli/0.32/pluggable-discovery-specification/
 sub _run_one_discovery {
   my ($toolname, $cmd) = @_;
 
-  # Let’s just hope that we don’t have running CommandRunner tasks...
-  # Otherwise we could have an actual handler that redirec to the CommandRunner
-  # one.
-  local $SIG{CHLD} = 'DEFAULT';
-  log_cmd $cmd;
-  my $pid = open2(my $chld_out, my $chld_in, $cmd);
-  fatal "Can’t execute the following command: $!\n\t${cmd}" unless defined $pid;
-  print $chld_in "HELLO 1 \"App::ArduinoBuilder 1.0.0\"\n";
-  # Some monitor don’t report a list if the commands are emitted too soon.
-  # Ideally we would check the output of the tool but it’s slightly difficult to
-  # do correctly without risking a deadlock.
-  usleep(5000);
-  print $chld_in "START\n";
-  usleep(5000);
-  print $chld_in "LIST\n";
-  usleep(5000);
-  print $chld_in "QUIT\n";
-  close $chld_in;
+  my $tool = App::ArduinoBuilder::JsonTool->new($cmd);
+  _fail_invalid_response($tool->send("HELLO 1 \"App::ArduinoBuilder 1.0.0\"\n"), 'hello', $toolname);
+  _fail_invalid_response($tool->send("START\n"), 'start', $toolname);
+  my $res = $tool->send("LIST\n");
+  _fail_invalid_response($tool->send("QUIT\n"), 'quit', $toolname);
 
-  my $json;
-  while (my $l = <$chld_out>) {
-    $json .= $l;
-  }
-  close $chld_out;
-  $json =~ s/\}\s*\{/},{/g;
-
-  full_debug "Command output:\n%s", \$json;  # Using a ref to force the Data::Dumper padding.
-
-  my $data = eval { decode_json "[${json}]" };
-  fatal "Could not parse pluggable discovery output: $@" if $@;
-  fatal "Invalid pluggable discovery data (ref($data) ne 'ARRAY') for ${toolname}: %s", ref($data) unless ref($data) eq 'ARRAY';
-  fatal "Invalid pluggable discovery data (@$data != 4) for ${toolname}: %d", scalar(@{$data}) unless @{$data} == 4;
-  fatal "Invalid pluggable discovery data (ref($data->[2]) ne 'HASH') for ${toolname}: %s", ref($data->[2]) unless ref($data->[2]) eq 'HASH';
-  fatal "Invalid pluggable discovery data ($data->[2]{eventType} ne 'list') for ${toolname}: %s", $data->[2]{eventType} unless $data->[2]{eventType} eq 'list';
-  debug "Pluggable discovery for ${toolname} found:\n%s", sub { $data->[2]{ports} };
-  return @{$data->[2]{ports}};
+  fatal "Invalid pluggable discovery data (eventType ne 'list') for ${toolname}: %s", $res unless $res->{eventType} eq 'list';
+  fatal "Pluggable discovery returned an error for ${toolname}: %s", $res if $res->{error} && $res->{error} eq 'true';
+  debug "Pluggable discovery for ${toolname} found:\n%s", $res->{ports};
+  return @{$res->{ports}};
 }
 
 # See: https://arduino.github.io/arduino-cli/0.32/platform-specification/#properties-from-pluggable-discovery

@@ -23,16 +23,12 @@ sub new {
     log_cmd $cmd;
     close $fo1;
     close $fi2;
-    #open my $old_in, '<&', \*STDIN or fatal "Can’t dup STDIN";
-    #open my $old_out, '>&', \*STDOUT or fatal "Can’t dup STDOUT";
     close STDIN;
     close STDOUT;
     open STDIN, '<&', $fi1 or fatal "Can’t reopen STDIN";
     open STDOUT, '>&', $fo2 or fatal "Can’t reopen STDOUT";
     close $fi1;
     close $fo2;
-    #close $old_in;
-    #close $old_out;
     # Maybe we could call system instead of exec, so that we can do some cleanup
     # task at the end.
     exec $cmd;
@@ -85,7 +81,8 @@ sub send {
         # Here, we could use sysread to check that there is no more any
         # meaningful content in the pipe. But let’s assume that we are talking
         # to correct tools for now.
-        my $data = eval { decode_json "${json}" };
+        my $data = eval { decode_json ${json} };
+        full_debug "Received following JSON:\n%s", $json;
         fatal "Could not parse JSON from tool output: $@" if $@;
         return $data;
       }
