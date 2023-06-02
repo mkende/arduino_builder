@@ -36,4 +36,17 @@ sub new {
   is($t->send("quit\n"), {cmd => 'bye!'});
 }
 
+{
+  my $t = new();
+  is ($t->send("with_blank\n"), {text => 'some text'});
+  is ($t->check_for_message(), U());
+}
+
+{
+  my $t = new();
+  is ($t->send("two_messages\n"), {count => 1});
+  is ($t->check_for_message(), {count => 2});
+  is ($t->check_for_message(), U());
+}
+
 done_testing;

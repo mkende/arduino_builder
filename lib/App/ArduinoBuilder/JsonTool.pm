@@ -5,7 +5,9 @@ package App::ArduinoBuilder::JsonTool;
 
 use strict;
 use warnings;
+no warnings 'experimental::defer';
 use utf8;
+use feature 'defer';
 
 use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Logger ':all_logger';
@@ -60,14 +62,17 @@ sub DESTROY {
   return;
 }
 
-sub send {
-  my ($this, $msg) = @_;
+# Read our input pipe for one full json object.
+# $json can be omitted or it can be a single already read character.
+sub _read_and_parse_json {
+  my ($this, $json) = @_;
 
-  full_debug "Sending message to tool: ${msg}";
-  $this->{out}->print($msg);
+  $json //= '';
+  my $braces = $json eq '{' ? 1 : 0;
 
-  my $json;
-  my $braces = 0;
+  my $b = $this->{in}->blocking(1);
+  defer { $this->{in}->blocking($b) }
+
   while (1) {
     my $count = $this->{in}->read(my $char, 1);
     # full_debug "Read from tool: ${content}";
@@ -87,6 +92,36 @@ sub send {
         fatal "Could not parse JSON from tool output: $@" if $@;
         return $data;
       }
+    }
+  }
+}
+
+sub send {
+  my ($this, $msg) = @_;
+
+  full_debug "Sending message to tool: ${msg}";
+  $this->{out}->print($msg);
+
+  return $this->_read_and_parse_json();
+}
+
+sub check_for_message {
+  my ($this) = @_;
+  
+  my $b = $this->{in}->blocking(0);
+  defer { $this->{in}->blocking($b) }
+
+  #error "Starting to check for message";
+
+  while(1) {
+    my $count = $this->{in}->read(my $char, 1);
+    #error "Read: %s", [$count, $char];
+    # We can’t easily distinguish an error case from an empty pipe, so we don’t try
+    # to do so.
+    return unless defined $count;
+    if ($char !~ m/[[:space:]]/s) {
+      #error "Saw -->$char<-- starting full parse";
+      return $this->_read_and_parse_json($char);
     }
   }
 }

@@ -17,6 +17,25 @@ $data{other} = <<EOF;
 }
 EOF
 
+# The input there contains space, tabs, etc.
+$data{with_blank} = <<EOF;
+{
+  "text": "some text"
+}
+   
+	
+
+EOF
+
+$data{two_messages} = <<EOF;
+{
+  "count": 1
+}
+{
+  "count": 2
+}
+EOF
+
 $data{quit} = <<EOF;
 {
   "cmd": "bye!"
