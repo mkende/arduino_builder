@@ -184,6 +184,8 @@ the absolute part. For example:
 
 =item C<builder.package.board>
 
+=item C<builder.arduino.install_dir>
+
 =item C<builder.default_build_dir>
 
 =item C<builder.source.path>
