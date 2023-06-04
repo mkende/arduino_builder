@@ -27,6 +27,7 @@ package App::ArduinoBuilder::CommandRunner::Task {
   sub data {
     my ($this) = @_;
     fatal "Trying to read the data of a still running task" if $this->running();
+    die $this->{error} if exists $this->{error};
     # TODO: we should have a variant for undef wantarray that does not setup
     # the whole pipe to get the return data.
     # Note: wantarray here is not necessarily the same as when the task was set
@@ -45,23 +46,31 @@ package App::ArduinoBuilder::CommandRunner::Task {
     usleep(1000) while $this->{running};
     return;
   }
+
+  sub pid {
+    my ($this) = @_;
+    return $this->{pid};
+  }
 }
 
 $SIG{CHLD} = sub {
   local ($!, $?);
   while( (my $pid = waitpid( -1, &WNOHANG)) > 0 ) {
-    if ($?) {
-      debug "Child process (pid == ${pid}) failed, waiting for all other child processes";
-      undef while wait() != -1;
-      fatal 'Child command failed';
-    }
     my $task = delete $children{$pid};
     unless (defined $task) {
       full_debug "Got SIGCHLD for unknown children with pid == ${pid}";
       return;
     }
     $task->{runner}{current_tasks}-- unless $task->{untracked};
-    if ($task->{channel}) {
+    if ($?) {
+      if ($task->{catch_error}) {
+        $task->{error} = "Child command failed: $?";
+      } else {
+        debug "Child process (pid == ${pid}) failed, waiting for all other child processes";
+        undef while wait() != -1;
+        fatal 'Child command failed';
+      }
+    } elsif ($task->{channel}) {
       local $/;
       my $fh = $task->{channel};
       my $data = <$fh>;
@@ -105,6 +114,13 @@ sub _fork_and_run {
   fatal "Cannot fork a sub-process" unless defined $pid;
 
   if ($pid == 0) {
+    $SIG{CHLD} = 'DEFAULT';
+    if (exists $options{SIG}) {
+      while (my ($k, $v) = each %{$options{SIG}}) {
+        $SIG{$k} = $v;
+      }
+    }
+
     # In the child task
     close $tracker_o;
     close $response_i;
@@ -149,6 +165,8 @@ sub _fork_and_run {
     runner => $this,
     running => 1,
     channel => $response_i,
+    pid => $pid,
+    catch_error => $options{catch_error},
   );
   $children{$pid} = $task;
   print $tracker_o "ignored\n";

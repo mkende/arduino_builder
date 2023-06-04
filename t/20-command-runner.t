@@ -7,6 +7,7 @@ use Test2::V0;
 use App::ArduinoBuilder::CommandRunner;
 
 use FindBin;
+use IO::Pipe;
 
 sub new {
   return App::ArduinoBuilder::CommandRunner->new(@_);
@@ -94,6 +95,29 @@ sub new {
   close $fi;
   is ($task->running(), T());
   close $fo;
+  $task->wait();
+  is ($task->running(), F());
+}
+
+{
+  my $task = new()->execute(sub {
+    sleep 1 while 1;
+  }, catch_error => 1);
+  kill 'INT', $task->pid();
+  $task->wait();
+  is ($task->running(), F());
+}
+
+{
+  my $mosi = IO::Pipe->new();  # from parent to child
+  my $task = new()->execute(sub {
+    $mosi->reader();
+    $mosi->read(my $buf, 1);
+  }, SIG => { INT => 'IGNORE'});
+  $mosi->writer();
+  kill 'INT', $task->pid();
+  is ($task->running(), T());
+  $mosi->close();
   $task->wait();
   is ($task->running(), F());
 }
