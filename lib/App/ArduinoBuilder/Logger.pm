@@ -9,8 +9,8 @@ use Data::Dumper;
 use Exporter 'import';
 
 our @EXPORT = qw(fatal error warning info debug full_debug dump dump_long dump_short);
-our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level set_prefix print_stack_on_fatal_error dump dump_short));
-our %EXPORT_TAGS = (all => [@EXPORT_OK], all_logger => [@EXPORT, 'log_cmd']);
+our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level is_logged set_prefix print_stack_on_fatal_error dump dump_short));
+our %EXPORT_TAGS = (default => [@EXPORT], all => [@EXPORT_OK], all_logger => [@EXPORT, 'log_cmd']);
 
 my $LEVEL_FATAL = 0;  # Fatal errors, abort the program.
 my $LEVEL_ERROR = 1;  # Recoverable errors (almost unused).
@@ -123,6 +123,11 @@ sub set_log_level {
   my ($level) = @_;
   $current_level = _string_to_level($level);
   return;
+}
+
+sub is_logged {
+  my ($level) = @_;
+  return $current_level >= _string_to_level($level);
 }
 
 sub print_stack_on_fatal_error {
