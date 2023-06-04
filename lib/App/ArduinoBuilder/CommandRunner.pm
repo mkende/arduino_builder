@@ -119,6 +119,8 @@ sub _fork_and_run {
       while (my ($k, $v) = each %{$options{SIG}}) {
         $SIG{$k} = $v;
       }
+      print $response_o "ready\n";
+      $response_o->flush();
     }
 
     # In the child task
@@ -169,6 +171,10 @@ sub _fork_and_run {
     catch_error => $options{catch_error},
   );
   $children{$pid} = $task;
+  if (exists $options{SIG}) {
+    my $ready = <$response_i>;
+    die "Got unexpected data during ready check: $ready" unless $ready eq "ready\n";
+  }
   print $tracker_o "ignored\n";
   close $tracker_o;
   if ($options{wait}) {

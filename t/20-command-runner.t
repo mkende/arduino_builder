@@ -106,10 +106,12 @@ sub new {
   kill 'INT', $task->pid();
   $task->wait();
   is ($task->running(), F());
+  like(dies {$task->data()}, qr/failed/);
 }
 
 {
   my $mosi = IO::Pipe->new();  # from parent to child
+  my $miso = IO::Pipe->new();
   my $task = new()->execute(sub {
     $mosi->reader();
     $mosi->read(my $buf, 1);
