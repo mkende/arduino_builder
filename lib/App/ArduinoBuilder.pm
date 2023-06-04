@@ -11,6 +11,7 @@ use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::Discovery;
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
+use App::ArduinoBuilder::Monitor;
 use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd', 'execute_cmd';
 
 use File::Basename;
@@ -21,6 +22,9 @@ use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
 our $VERSION = '0.06';
+
+# User agent used for the pluggable discovery and pluggable monitor tools.
+our $TOOLS_USER_AGENT = "\"App::ArduinoBuilder ${VERSION}\"";
 
 sub Run {
   my $config = App::ArduinoBuilder::Config->new();
@@ -41,7 +45,7 @@ sub Run {
       'target-port|port=s' => sub { $config->set('builder.upload.port' => $_[1], allow_override => 1)},
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
-  if (my @unknown = grep { !/^(clean|build|discover|upload)$/ } @ARGV) {
+  if (my @unknown = grep { !/^(clean|build|discover|upload|monitor)$/ } @ARGV) {
     fatal "Unknown command%s: %s", (@unknown > 1 ? 's' : ''), join(', ', @unknown);
   }
 
@@ -55,11 +59,18 @@ sub Run {
   if (grep { /^build$/ } @ARGV) {
     build($config, \@skip, \@force, \@only);
   }
-  if (grep { /^(discover|upload)$/ } @ARGV) {
+  if (grep { /^discover$/ } @ARGV && ! grep { /^(upload|monitor)$/ } @ARGV) {
     discover($config);
   }
   if (grep { /^upload$/ } @ARGV) {
+    discover($config);
     upload($config);
+  }
+  if (grep { /^monitor$/ } @ARGV) {
+    # The upload process potentially modifies the board port, so we run the
+    # discovery here even if it was run on upload.
+    discover($config);
+    monitor($config);
   }
 }
 
@@ -465,6 +476,17 @@ sub upload {
 
   info 'Success!';
 
+}
+
+sub monitor {
+  my ($config) = @_;
+
+  info 'Running board monitor. Press ctrl+c to exit...';
+
+  my $port = select_port($config);
+  App::ArduinoBuilder::Monitor::monitor($config, $port);
+
+  info 'Success!';
 }
 
 1;

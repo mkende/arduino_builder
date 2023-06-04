@@ -61,16 +61,22 @@ command (in particular if you have deleted a source file).
 =item B<discover>
 
 Run the board discovery to detect your board. This command is implied by the
-B<upload> command.
+B<upload> and/or B<monitor> commands.
 
 =item B<upload>
 
-Upload the compiled binary to your board. If the B<build> command the binary
-must already exist and no new version will be compiled before the upload.
+Upload the compiled binary to your board. If the B<build> command is not
+executed, the binary must already exist and no new version will be compiled
+before the upload.
 
 Note that the end of the compilation phase will report whether your binary can
 hold in your board memory (and will abort the program if not) but the B<upload>
 command itself does not perform such a check.
+
+=item B<monitor>
+
+Open a connection to the board that allows to interract with a running program.
+This is usually, but not necessarily, done through a serial port.
 
 =back
 
