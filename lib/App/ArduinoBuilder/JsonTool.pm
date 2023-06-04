@@ -14,8 +14,12 @@ use App::ArduinoBuilder::Logger ':all_logger';
 use IO::Pipe;
 use JSON::PP;
 
+# TODO: look into what should be done with UTF-8 encoding when communicating
+# with the tool.
+
 sub new {
-  my ($class, $cmd) = @_;
+  my ($class, $cmd, %options) = @_;
+  # The only option that we expect to use is the SIG one, to ignore a SIGINT.
 
   my $mosi = IO::Pipe->new();  # from parent to child
   my $miso = IO::Pipe->new();  # from child to parent
@@ -36,7 +40,7 @@ sub new {
     # task at the end (and be notified here if the tool terminate abruptly while
     # we are still trying to communicate with it).
     exec $cmd;
-  });
+  }, %options);
 
   $mosi->writer();
   $miso->reader();
