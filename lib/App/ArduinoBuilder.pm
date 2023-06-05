@@ -42,7 +42,7 @@ sub Run {
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
       'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
       'parallelize|j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
-      'target-port|port=s' => sub { $config->set('builder.upload.port' => $_[1], allow_override => 1)},
+      'target-port|port=s' => sub { $config->append('builder.upload.port' => $_[1], ',')},
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   if (my @unknown = grep { !/^(clean|build|discover|upload|monitor)$/ } @ARGV) {
@@ -434,9 +434,14 @@ sub select_port {
   my @ports = @{$config->get('builder.internal.ports')};
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
-  my @targets = split(/\s*,\s*/, $config->get('builder.upload.port'));
-  my $port = first { my $port = $_; any { $port->get('upload.port.label') eq $_ || $port->get('upload.port.address') eq $_ } @targets } @ports;
-  fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets) unless defined $port;
+  my @targets = map { fc } split(/\s*,\s*/, $config->get('builder.upload.port'));
+  my $port = first { my $port = $_; any { $port->get('upload.port.lc_label') eq $_ || $port->get('upload.port.lc_address') eq $_ } @targets } @ports;
+  unless (defined $port) {
+    error "None of the found ports match the specified ones";
+    error "Found the following ports: %s", join(', ', map { $_->get('upload.port.label') } @ports);
+    error "Specified ports: %s", join(', ', @targets);
+    fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets);
+  }
 
   $config->set('builder.internal.selected_port' => $port);
   return $port;

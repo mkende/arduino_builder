@@ -127,8 +127,8 @@ key in brackets. For examples:
 
 =head1 CONFIGURATION FILES
 
-When you start `arduino_builder` it will read a set of configuration files. Once
-a key is defined by a given file it will not be overriden by other files
+When you start C<arduino_builder> it will read a set of configuration files.
+Once a key is defined by a given file it will not be overriden by other files
 defining the same key. So the most specific configuration should be loaded
 first.
 
@@ -178,13 +178,17 @@ the absolute part. For example:
 
   builder.default_build_dir={builder.project_dir}/_build
 
+In the list below, the configuration names followed by an asterisk C<*> are
+those that should usually be in F<arduino_builder.local> file rather than in the
+F<arduino_builder.config> one.
+
 =over 4
 
 =item C<builder.project_name>
 
 =item C<builder.package.name>
 
-=item C<builder.package.path>
+=item C<builder.package.path>*
 
 =item C<builder.package.arch>
 
@@ -202,11 +206,19 @@ the absolute part. For example:
 
 =item C<builder.library.XXX>
 
-=item C<builder.parallelize>
+=item C<builder.parallelize>*
 
 =item C<builder.config.append.XXX>
 
-=item C<builder.upload.port>
+=item C<builder.upload.port>*
+
+The port to use to upload and/or monitor the board. The passed value should be
+the label of a port found by the B<monitor> command (typically the name of the
+serial port to use). You can run C<arduino_builder monitor -l debug> to see
+which ports are found by the command.
+
+You can also use a comma separated list for this configuration value in case
+your board can appear under different ports.
 
 =item C<builder.project_dir>
 

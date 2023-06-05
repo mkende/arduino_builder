@@ -55,6 +55,11 @@ sub _port_to_config {
     $port_config->set('serial.port.file' => $port_config->get('upload.port.label'));
   }
 
+  # Case folded versions, later used to compare to the content of the --port
+  # option.
+  $port_config->set('upload.port.lc_label', lc($port_config->get('upload.port.label')));
+  $port_config->set('upload.port.lc_address', lc($port_config->get('upload.port.address')));
+
   return $port_config;
 }
 

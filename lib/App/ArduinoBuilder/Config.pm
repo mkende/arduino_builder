@@ -105,9 +105,9 @@ sub set {
 }
 
 sub append {
-  my ($this, $key, $value) = @_;
+  my ($this, $key, $value, $sep) = @_;
   if ($this->{config}{$key}) {
-    $this->{config}{$key} .= ' '.$value;
+    $this->{config}{$key} .= ($sep // ' ').$value;
   } else {
     $this->{config}{$key} = $value;
   }
