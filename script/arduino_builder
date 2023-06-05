@@ -300,6 +300,7 @@ handled.
 If the reset to bootloader is not performed by the upload tools used, Arduino
 Builder cannot yet perform this reset itself (documented
 L<here|https://arduino.github.io/arduino-cli/0.32/platform-specification/#1200-bps-bootloader-reset>).
+
 =back
 
 =head1 AUTHOR
