@@ -75,6 +75,18 @@ sub monitor {
   my $select = IO::Select->new();
   $select->add($client);
   $select->add(\*STDIN);
+
+  # For the RP2040 core, setting the baudrate reset the board, also asserting
+  # the DTR and RTS line at the same time make it enter its bootloader.
+  # TODO: test the behavior of other core and boards.
+  # TODO: make all this be configurable (and happen only with the serial
+  # monitor).
+  $tool->send("CONFIGURE baudrate 1200\n");
+  #$tool->send("CONFIGURE rts off\n");
+  #$tool->send("CONFIGURE dtr off\n");
+  #$tool->send("CONFIGURE rts on\n");
+  #$tool->send("CONFIGURE dtr on\n");
+  $tool->send("CONFIGURE baudrate 9600\n");
   
   # TODO: look into what to do about UTF-D when communicating over the socket.
   {
