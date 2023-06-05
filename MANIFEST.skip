@@ -1,5 +1,6 @@
 ^_test/
 ^.git/
+^.vscode/
 ^.gitignore$
 .*\.sublime-project$
 .*\.sublime-workspace$
