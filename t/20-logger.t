@@ -16,6 +16,9 @@ is(warns { debug 'is printed' } , "DEBUG: is printed\n");
 
 is(warns { debug 'later: %s', sub { "deferred" } } , "DEBUG: later: deferred\n");
 
-is(warns { debug 'dumped: %s', \"ref" } , "DEBUG: later: deferred\n");
+like(warns { debug 'dumped: %s', \"ref" } , qr/^DEBUG: dumped:\s+\\'ref'$/m);
+
+is(warns { debug "dumped\n" } , "DEBUG: dumped\n");
+is(warns { debug "dumped\n\nend" } , "DEBUG: dumped\n\nend\n");
 
 done_testing;

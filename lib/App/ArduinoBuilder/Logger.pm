@@ -82,6 +82,7 @@ sub _log {
   return if $level > $current_level;
   @args = map { _stringify($_) } @args;
   my $msg = sprintf "%s%s${message}\n", _level_to_prefix($level), $prefix, @args;
+  chomp($msg) if $msg =~ m/\n\n$/;
   if ($level == $LEVEL_FATAL) {
     if ($die_with_stack_trace) {
       confess $msg.'Died';  # Will print "message\nDied at foo.pm line 45\n..."
