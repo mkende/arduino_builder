@@ -21,7 +21,7 @@ use Getopt::Long;
 use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 # User agent used for the pluggable discovery and pluggable monitor tools.
 our $TOOLS_USER_AGENT = "\"App::ArduinoBuilder ${VERSION}\"";
