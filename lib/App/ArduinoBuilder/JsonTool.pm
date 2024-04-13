@@ -9,10 +9,10 @@ no warnings 'experimental::defer';
 use utf8;
 use feature 'defer';
 
-use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Logger ':all_logger';
 use IO::Pipe;
 use JSON::PP;
+use Parallel::TaskExecutor 'default_executor';
 
 # TODO: look into what should be done with UTF-8 encoding when communicating
 # with the tool.
@@ -26,7 +26,7 @@ sub new {
 
   # Custom re-implementation of open2 (but using our CommandRunner so that we
   # don’t have to mess again with $SIG{CHLD}).
-  my $task = default_runner()->execute(sub {
+  my $task = default_executor()->run(sub {
     log_cmd $cmd;
     $mosi->reader();
     $miso->writer;

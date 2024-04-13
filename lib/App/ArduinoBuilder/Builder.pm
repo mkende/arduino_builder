@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use utf8;
 
-use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::DepCheck 'check_dep';
 use App::ArduinoBuilder::FilePath 'find_all_files_with_extensions';
@@ -12,6 +11,7 @@ use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::System 'execute_cmd';
 use File::Path 'make_path';
 use File::Spec::Functions 'catfile';
+use Parallel::TaskExecutor 'default_executor';
 
 my @supported_source_extensions = qw(c cpp S ino);
 
@@ -148,7 +148,7 @@ sub build_archive {
       # uncommented to execute the dependency check inside the forked process.
       # However this does not seem to improve the execution speed.
       next unless $force || check_dep($s, $object_file);
-      push @tasks, default_runner()->execute(
+      push @tasks, default_executor()->run(
         sub {
           # return unless $force || check_dep($s, $object_file);
           $this->build_file($s, $object_file);
@@ -156,7 +156,7 @@ sub build_archive {
         });
     }
   }
-  default_runner->wait();
+  default_executor->wait();
   my $did_something;
   for my $t (@tasks) {
     my $o = $t->data();
@@ -180,14 +180,14 @@ sub build_object_files {
   for my $s (@sources) {
     my $object_file = $obj_name->object_for($s);
     next unless $force || check_dep($s, $object_file);
-    push @tasks, default_runner()->execute(
+    push @tasks, default_executor()->run(
       sub {
         # return unless $force || check_dep($s, $object_file);
         $this->build_file($s, $object_file);
         return 1;
       });
   }
-  default_runner->wait();
+  default_executor->wait();
   for my $t (@tasks) {
     my $o = $t->data();
     if ($o) {

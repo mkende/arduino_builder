@@ -6,13 +6,13 @@ use warnings;
 use utf8;
 
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
-use App::ArduinoBuilder::CommandRunner;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::Discovery;
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
 use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::Monitor;
 use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd', 'execute_cmd';
+use Parallel::TaskExecutor 'default_executor';
 
 use File::Basename;
 use File::Path 'remove_tree';
@@ -251,7 +251,7 @@ sub generate_project_config {
   full_debug "Complete configuration: \n%s", sub { $config->dump('  ') };
 
   if ($config->exists('builder.parallelize')) {
-    default_runner()->set_max_parallel_tasks($config->get('builder.parallelize'));
+    default_executor()->set_max_parallel_tasks($config->get('builder.parallelize'));
   }
 
   return 1;
@@ -474,7 +474,7 @@ sub upload {
 
   my $cmd = $upload_config->get('upload.pattern');
   debug "Upload configuration:\n%s", sub { $upload_config->dump('  ') };
-  default_runner()->run_forked(sub {
+  default_executor()->run_now(sub {
         close STDIN;
         execute_cmd($cmd);
       });
