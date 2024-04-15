@@ -2,7 +2,9 @@ Revision history for Perl distribution App-ArduinoBuilder
 
 0.08 - ??
 
- - Improve the logger
+ - Improve the logging, convert it to using Log::Log4per
+ - Replace the custom CommandRunner with Parallel::TaskExecutor (the same code
+   forked to a new separate distribution).
 
 0.07 - 2023-06-05
 

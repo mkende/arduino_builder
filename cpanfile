@@ -29,6 +29,7 @@ on 'develop' => sub {
 # End of the template. You can add custom content below this line.
 
 requires 'Parallel::TaskExecutor';
+requires 'Data::Section::Simple';
 
 on 'test' => sub {
   requires 'Log::Log4perl::CommandLine';

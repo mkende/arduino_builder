@@ -5,6 +5,17 @@ use strict;
 use warnings;
 use utf8;
 
+use Data::Section::Simple;
+use Log::Log4perl;
+use Log::Log4perl::Level;
+
+# The create_custom_level call must happen before any call to get_logger, so
+# let’s do it early.
+BEGIN {
+  # We create a new FULL_DEBUG level, below the standard TRACE level.
+  Log::Log4perl::Logger::create_custom_level('CMD', 'DEBUG');
+}
+
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::Discovery;
@@ -21,16 +32,17 @@ use Getopt::Long;
 use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
-# TODO: remove
-use Log::Log4perl qw(:easy);
-Log::Log4perl->easy_init($ERROR);
-
 our $VERSION = '0.07';
 
 # User agent used for the pluggable discovery and pluggable monitor tools.
 our $TOOLS_USER_AGENT = "\"App::ArduinoBuilder ${VERSION}\"";
 
 sub Run {
+  # We initialize Log4perl here because we might need to log early during the
+  # initialization. But the default level or even the full config can be
+  # overriden later.
+  Log::Log4perl->init(\Data::Section::Simple::get_data_section('log4perl.conf'));
+
   my $config = App::ArduinoBuilder::Config->new();
 
   my (@skip, @force, @only);
@@ -499,3 +511,50 @@ sub monitor {
 }
 
 1;
+
+__DATA__
+
+@@ log4perl.conf
+
+# We send all messages to two appenders (one that prints the level and the
+# other that does not). But they have each a LevelMatch filter attached so
+# that each message is eventually only printed once.
+# This is so that frequent message (below the INFO level) are printed without
+# their level to increase readability (especially for command lines). More
+# serious messages are displayed with their level.
+#
+# All of that can be configured with the --logconf flag.
+#
+# Remember that we have a custom log level.
+# 
+# The default log level itself is set to a default here but can be configured
+# later too.
+log4perl.rootLogger = INFO, ScreenWithLevel, ScreenWithoutLevel
+
+# Configuration of the ScreenWithLevel appender for the levels INFO to
+# FATAL.
+log4perl.appender.ScreenWithLevel = Log::Log4perl::Appender::Screen
+log4perl.appender.ScreenWithLevel.layout = PatternLayout
+log4perl.appender.ScreenWithLevel.layout.ConversionPattern = %p: %m%n
+log4perl.appender.ScreenWithLevel.Filter = InfoToFatalFilter
+
+log4perl.filter.InfoToFatalFilter = Log::Log4perl::Filter::LevelRange
+log4perl.filter.InfoToFatalFilter.LevelMin = INFO
+log4perl.filter.InfoToFatalFilter.LevelMax = FATAL
+log4perl.filter.InfoToFatalFilter.AcceptOnMatch = true
+
+# Configuration of the ScreenWithoutLevel appender for the levels levels below
+# INFO.
+log4perl.appender.ScreenWithoutLevel = Log::Log4perl::Appender::Screen
+log4perl.appender.ScreenWithoutLevel.layout = PatternLayout
+log4perl.appender.ScreenWithoutLevel.layout.ConversionPattern = %m%n
+log4perl.appender.ScreenWithoutLevel.Filter = DebugFilter
+
+# We just define this filter as the complement of the other one, to be sure not
+# to loose any message, even with our custom level.
+log4perl.filter.DebugFilter = Log::Log4perl::Filter::LevelRange
+log4perl.filter.DebugFilter.LevelMin = INFO
+log4perl.filter.DebugFilter.LevelMax = FATAL
+log4perl.filter.DebugFilter.AcceptOnMatch = false
+
+log4perl.oneMessagePerAppender = 1

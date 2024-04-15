@@ -7,6 +7,8 @@ use utf8;
 use Carp qw(confess);
 use Data::Dumper;
 use Exporter 'import';
+use Log::Log4perl;
+use Log::Log4perl::Level ();
 
 our @EXPORT = qw(fatal error warning info debug full_debug dump dump_long dump_short);
 our @EXPORT_OK = (@EXPORT, qw(log_cmd set_log_level is_logged set_prefix print_stack_on_fatal_error dump dump_short));
@@ -22,19 +24,19 @@ my $LEVEL_FULL_DEBUG = 6;  # Any possibly very-lengthy debugging information.
 
 my $default_level = $ENV{ARDUINO_BUILDER_LOG_LEVEL} // $LEVEL_INFO;
 my $current_level = $default_level;
-my $prefix = '';
 my $die_with_stack_trace = 0;
 
-sub _level_to_prefix {
+sub _level_to_log4perl_level {
   my ($level) = @_;
-  return 'FATAL: ' if $level == $LEVEL_FATAL;
-  return 'ERROR: ' if $level == $LEVEL_ERROR;
-  return 'WARNING: ' if $level == $LEVEL_WARN;
-  return 'INFO: ' if $level == $LEVEL_INFO;
-  return 'DEBUG: ' if $level == $LEVEL_DEBUG;
-  return '' if $level == $LEVEL_CMD || $level == $LEVEL_FULL_DEBUG;
+  return Log::Log4perl::Level::to_priority("FATAL") if $level == $LEVEL_FATAL;
+  return Log::Log4perl::Level::to_priority("ERROR") if $level == $LEVEL_ERROR;
+  return Log::Log4perl::Level::to_priority("WARNING") if $level == $LEVEL_WARN;
+  return Log::Log4perl::Level::to_priority("INFO") if $level == $LEVEL_INFO;
+  return Log::Log4perl::Level::to_priority("DEBUG") if $level == $LEVEL_DEBUG;
+  return Log::Log4perl::Level::to_priority("CMD") if $level == $LEVEL_CMD;
+  return Log::Log4perl::Level::to_priority("TRACE") if $level == $LEVEL_FULL_DEBUG;
   error("Unknown log level: ${level}");
-  return 'UNKNOWN';
+  return $Log::Log4perl::Level::ERROR;
 }
 
 sub _stringify {
@@ -79,18 +81,22 @@ sub dump_short {
 
 sub _log {
   my ($level, $message, @args) = @_;
-  return if $level > $current_level;
-  @args = map { _stringify($_) } @args;
-  my $msg = sprintf "%s%s${message}\n", _level_to_prefix($level), $prefix, @args;
-  chomp($msg) if $msg =~ m/\n\n$/;
+  my $calling_pkg = caller(2);
+  my $logger = Log::Log4perl->get_logger($calling_pkg);
+  my $req_level = _level_to_log4perl_level($level);
+  if (Log::Log4perl::Level::isGreaterOrEqual($logger->level(), $req_level)) {
+    @args = map { _stringify($_) } @args;
+    my $msg = sprintf $message, @args;
+    $logger->log($req_level, $msg);
+  }
   if ($level == $LEVEL_FATAL) {
+    @args = map { _stringify($_) } @args;
+    my $msg = sprintf $message, @args;
     if ($die_with_stack_trace) {
-      confess $msg.'Died';  # Will print "message\nDied at foo.pm line 45\n..."
+      confess $msg."\nDied";  # Will print "message\nDied at foo.pm line 45\n..."
     } else {
-      die $msg;
+      die $msg."\n";
     }
-  } else {
-    warn $msg;
   }
   return;
 }
@@ -121,14 +127,16 @@ sub _string_to_level {
 }
 
 sub set_log_level {
-  my ($level) = @_;
-  $current_level = _string_to_level($level);
+  my ($str_level) = @_;
+  Log::Log4perl->get_logger("")->level(_level_to_log4perl_level(_string_to_level($str_level)));
   return;
 }
 
 sub is_logged {
   my ($level) = @_;
-  return $current_level >= _string_to_level($level);
+  my $calling_pkg = caller(1);
+  my $logger = Log::Log4perl->get_logger($calling_pkg);
+  return Log::Log4perl::Level::isGreaterOrEqual($logger->level(), _level_to_log4perl_level($level));
 }
 
 sub print_stack_on_fatal_error {
