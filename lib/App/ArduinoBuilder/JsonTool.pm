@@ -5,9 +5,7 @@ package App::ArduinoBuilder::JsonTool;
 
 use strict;
 use warnings;
-no warnings 'experimental::defer';
 use utf8;
-use feature 'defer';
 
 use App::ArduinoBuilder::Logger ':all_logger';
 use IO::Pipe;
@@ -75,7 +73,6 @@ sub _read_and_parse_json {
   my $braces = $json eq '{' ? 1 : 0;
 
   my $b = $this->{in}->blocking(1);
-  defer { $this->{in}->blocking($b) }
 
   while (1) {
     my $count = $this->{in}->read(my $char, 1);
@@ -113,7 +110,6 @@ sub check_for_message {
   my ($this) = @_;
   
   my $b = $this->{in}->blocking(0);
-  defer { $this->{in}->blocking($b) }
 
   #error "Starting to check for message";
 

@@ -2,7 +2,9 @@ use strict;
 use warnings;
 use utf8;
 
+use Log::Log4perl::CommandLine ':all';
 use Test2::V0;
+use Test2::IPC;
 
 use App::ArduinoBuilder::JsonTool;
 
@@ -27,7 +29,6 @@ sub new {
   is($t->send("other\n"), {text => 'more text'});
   is($t->send("hello\n"), {foo => 'bar', bin => [qw(test1 test2)], baz => {key => 'value'}});
 }
-
 
 {
   my $t = new();

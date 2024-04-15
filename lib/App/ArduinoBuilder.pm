@@ -21,6 +21,10 @@ use Getopt::Long;
 use List::Util 'any', 'none', 'first';
 use Pod::Usage;
 
+# TODO: remove
+use Log::Log4perl qw(:easy);
+Log::Log4perl->easy_init($ERROR);
+
 our $VERSION = '0.07';
 
 # User agent used for the pluggable discovery and pluggable monitor tools.
