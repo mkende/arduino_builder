@@ -51,33 +51,18 @@ sub _stringify {
   return Dumper($s);
 }
 
-sub _stringify_short {
-  my ($s) = @_;
-  $s = $s->() if ref $s eq 'CODE';
-  return $s unless ref $s;
-  local $Data::Dumper::Indent = 0;
-  local $Data::Dumper::Pad = '';
-  local $Data::Dumper::Terse = 1;
-  local $Data::Dumper::Sortkeys = 1;
-  local $Data::Dumper::Sparseseen = 1;
-  return Dumper($s);
-}
+# sub _stringify_short {
+#   my ($s) = @_;
+#   $s = $s->() if ref $s eq 'CODE';
+#   return $s unless ref $s;
+#   local $Data::Dumper::Indent = 0;
+#   local $Data::Dumper::Pad = '';
+#   local $Data::Dumper::Terse = 1;
+#   local $Data::Dumper::Sortkeys = 1;
+#   local $Data::Dumper::Sparseseen = 1;
+#   return Dumper($s);
+# }
 
-# TODO: make these return objects that can be stringified automatically so that
-# this work with any printing.
-sub dump {
-  my ($data) = @_;
-  return sub { _stringify($data) };
-}
-
-sub dump_long {
-  return &dump->(@_);
-}
-
-sub dump_short {
-  my ($data) = @_;
-  return sub { _stringify_short($data) };
-}
 
 sub _log {
   my ($level, $message, @args) = @_;
@@ -114,7 +99,7 @@ sub log_cmd { _log($LEVEL_CMD, @_) }
 sub full_debug { _log($LEVEL_FULL_DEBUG, @_) }
 
 sub _string_to_level {
-  my ($level) = @_;
+  my ($level) = @_; 
   return $LEVEL_FATAL if $level =~ m/^FATAL$/i;
   return $LEVEL_ERROR if $level =~ m/^ERR(?:OR)?$/i;
   return $LEVEL_WARN if $level =~ m/^WARN(:?ING)?$/i;
