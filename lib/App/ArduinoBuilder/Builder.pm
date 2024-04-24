@@ -7,11 +7,11 @@ use utf8;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::DepCheck 'check_dep';
 use App::ArduinoBuilder::FilePath 'find_all_files_with_extensions';
-use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::System 'execute_cmd';
 use File::Path 'make_path';
 use File::Spec::Functions 'catfile';
 use Parallel::TaskExecutor 'default_executor';
+use Log::Any::Simple ':default';
 
 my @supported_source_extensions = qw(c cpp S ino);
 

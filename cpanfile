@@ -30,6 +30,10 @@ on 'develop' => sub {
 
 requires 'Parallel::TaskExecutor';
 requires 'Data::Section::Simple';
+requires 'Log::Log4perl';
+requires 'Log::Any';
+requires 'Log::Any::Simple';
+requires 'Log::Any::Adapter::Log4perl';
 
 on 'test' => sub {
   requires 'Log::Log4perl::CommandLine';

@@ -4,8 +4,8 @@ use strict;
 use warnings;
 use utf8;
 
-use App::ArduinoBuilder::Logger '!dump';
 use Exporter 'import';
+use Log::Any::Simple ':default';
 
 our @EXPORT_OK = qw(get_os_name);
 

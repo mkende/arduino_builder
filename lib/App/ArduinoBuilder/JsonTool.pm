@@ -7,10 +7,10 @@ use strict;
 use warnings;
 use utf8;
 
-use App::ArduinoBuilder::Logger ':all_logger';
 use IO::Pipe;
 use JSON::PP;
 use Parallel::TaskExecutor 'default_executor';
+use Log::Any::Simple ':default';
 
 # TODO: look into what should be done with UTF-8 encoding when communicating
 # with the tool.
@@ -25,7 +25,7 @@ sub new {
   # Custom re-implementation of open2 (but using our CommandRunner so that we
   # don’t have to mess again with $SIG{CHLD}).
   my $task = default_executor()->run(sub {
-    log_cmd $cmd;
+    trace $cmd;
     $mosi->reader();
     $miso->writer;
     close STDIN;
@@ -59,7 +59,7 @@ sub DESTROY {
   my ($this) = @_;
   $this->{out}->close();
   $this->{in}->close();
-  full_debug "Waiting for tool to stop";
+  trace "Waiting for tool to stop";
   $this->{task}->wait();
   return;
 }
@@ -76,7 +76,7 @@ sub _read_and_parse_json {
 
   while (1) {
     my $count = $this->{in}->read(my $char, 1);
-    # full_debug "Read from tool: ${content}";
+    # trace "Read from tool: ${content}";
     fatal "An error occured while reading tool output: $!" unless defined $count;
     fatal "Unexpected end of file stream while reading tool output" if $count == 0;
     $json .= $char;
@@ -89,7 +89,7 @@ sub _read_and_parse_json {
         # meaningful content in the pipe. But let’s assume that we are talking
         # to correct tools for now.
         my $data = eval { decode_json ${json} };
-        full_debug "Received following JSON:\n%s", $json;
+        trace "Received following JSON:\n%s", $json;
         fatal "Could not parse JSON from tool output: $@" if $@;
         return $data;
       }
@@ -100,7 +100,7 @@ sub _read_and_parse_json {
 sub send {
   my ($this, $msg) = @_;
 
-  full_debug "Sending message to tool: ${msg}";
+  trace "Sending message to tool: ${msg}";
   $this->{out}->print($msg);
 
   return $this->_read_and_parse_json();

@@ -5,31 +5,23 @@ use strict;
 use warnings;
 use utf8;
 
-use Data::Section::Simple;
-use Log::Log4perl;
-use Log::Log4perl::Level;
-
-# The create_custom_level call must happen before any call to get_logger, so
-# let’s do it early.
-BEGIN {
-  # We create a new FULL_DEBUG level, below the standard TRACE level.
-  Log::Log4perl::Logger::create_custom_level('CMD', 'DEBUG');
-}
-
 use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::Discovery;
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
-use App::ArduinoBuilder::Logger;
 use App::ArduinoBuilder::Monitor;
 use App::ArduinoBuilder::System 'find_arduino_dir', 'system_cwd', 'execute_cmd';
-use Parallel::TaskExecutor 'default_executor';
-
+use Data::Section::Simple;
 use File::Basename;
 use File::Path 'remove_tree';
 use File::Spec::Functions;
 use Getopt::Long;
 use List::Util 'any', 'none', 'first';
+use Log::Log4perl;
+use Log::Log4perl::Level;
+use Log::Any::Adapter;
+use Log::Any::Simple ':default';
+use Parallel::TaskExecutor 'default_executor';
 use Pod::Usage;
 
 our $VERSION = '0.07';
@@ -37,11 +29,31 @@ our $VERSION = '0.07';
 # User agent used for the pluggable discovery and pluggable monitor tools.
 our $TOOLS_USER_AGENT = "\"App::ArduinoBuilder ${VERSION}\"";
 
+sub _string_to_log4perl_level {
+  my ($level) = @_; 
+  return "FATAL" if $level =~ m/^FATAL$/i;
+  return "ERROR" if $level =~ m/^ERR(?:OR)?$/i;
+  return "WARNING" if $level =~ m/^WARN(:?ING)?$/i;
+  return "INFO" if $level =~ m/^INFO?$/i;
+  return "DEBUG" if $level =~ m/^(?:DBG|DEBUG)$/i;
+  return "TRACE" if $level =~ m/^(?:TRACE|FULL(:?_?(?:DBG|DEBUG))?)$/i;
+  fatal "Unknown log level: ${level}";
+}
+
+sub set_log_level {
+  my ($str_level) = @_;
+  my $log4perl_priority = Log::Log4perl::Level::to_priority(_string_to_log4perl_level($str_level));
+  Log::Log4perl->get_logger("")->level($log4perl_priority);
+  return;
+}
+
 sub Run {
   # We initialize Log4perl here because we might need to log early during the
   # initialization. But the default level or even the full config can be
   # overriden later.
   Log::Log4perl->init(\Data::Section::Simple::get_data_section('log4perl.conf'));
+  Log::Any::Adapter->set('Log4perl');
+  set_log_level($ENV{ARDUINO_BUILDER_LOG_LEVEL}) if exists $ENV{ARDUINO_BUILDER_LOG_LEVEL};
 
   my $config = App::ArduinoBuilder::Config->new();
 
@@ -50,13 +62,13 @@ sub Run {
       'help|h' => sub { pod2usage(-exitval => 0, -verbose => 2)},
       'project-dir|project|p=s' => sub { $config->set('builder.project_dir' => $_[1], allow_override => 1) },
       'build-dir|build|b=s' => sub { $config->set('builder.internal.build_dir' => $_[1], allow_override => 1) },
-      'log-level|l=s' => sub { App::ArduinoBuilder::Logger::set_log_level($_[1]) },
+      'log-level|l=s' => sub { set_log_level($_[1]) },
       'config|c=s%' => sub { $config->set($_[1] => $_[2], allow_override => 1) },
       'menu=s%' => sub { $config->set('builder.menu.'.$_[1] => $_[2], allow_override => 1) },
       'skip=s@' => sub { push @skip, split /,/, $_[1] },  # skip this step
       'force=s@' => sub { push @force, split /,/, $_[1] },  # even if it would be skipped by the dependency checker
       'only=s@' => sub { push @only, split /,/, $_[1] },  # run only these steps (skip all others)
-      'stack-trace-on-error|stack' => sub { App::ArduinoBuilder::Logger::print_stack_on_fatal_error(1) },
+      'stack-trace-on-error|stack' => sub { Log::Any::Simple::die_with_stack_trace('long') },
       'parallelize|j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
       'target-port|port=s' => sub { $config->append('builder.upload.port' => $_[1], ',')},
     ) or pod2usage(-exitval => 2, -verbose =>0);
@@ -202,7 +214,7 @@ sub generate_project_config {
     # directly by the user (e.g. on the command line), which is way all this is
     # done in a temporary config.
     my $menu_value = $board_menu->filter("${m}.${v}");
-    full_debug "Merging menu values for menu '${m}' with key '${v}':\n%s", sub { $menu_value->dump('  ') };
+    trace "Merging menu values for menu '${m}' with key '${v}':\n%s", sub { $menu_value->dump('  ') };
     $board_config->merge($menu_value, allow_override => 1);
   }
   $config->merge($board_config);
@@ -264,7 +276,7 @@ sub generate_project_config {
   # considerations that we are not handling yet from:
   # https://arduino.github.io/arduino-cli/0.32/package_index_json-specification/#how-a-tools-path-is-determined-in-platformtxt
 
-  full_debug "Complete configuration: \n%s", sub { $config->dump('  ') };
+  trace "Complete configuration: \n%s", sub { $config->dump('  ') };
 
   if ($config->exists('builder.parallelize')) {
     default_executor()->set_max_parallel_tasks($config->get('builder.parallelize'));
@@ -551,7 +563,7 @@ log4perl.appender.ScreenWithoutLevel.layout.ConversionPattern = %m%n
 log4perl.appender.ScreenWithoutLevel.Filter = DebugFilter
 
 # We just define this filter as the complement of the other one, to be sure not
-# to loose any message, even with our custom level.
+# to loose any message.
 log4perl.filter.DebugFilter = Log::Log4perl::Filter::LevelRange
 log4perl.filter.DebugFilter.LevelMin = INFO
 log4perl.filter.DebugFilter.LevelMax = FATAL

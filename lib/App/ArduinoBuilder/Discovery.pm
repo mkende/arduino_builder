@@ -6,8 +6,8 @@ use utf8;
 
 use App::ArduinoBuilder::Config;
 use App::ArduinoBuilder::JsonTool;
-use App::ArduinoBuilder::Logger ':all_logger';
 use File::Spec::Functions;
+use Log::Any::Simple ':default';
 
 
 sub _test_command_response {
