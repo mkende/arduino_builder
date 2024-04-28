@@ -82,6 +82,7 @@ sub _ino_to_cpp {
   # TODO: there is a step in the real Arduino tool that is badly documented but which uses ctags to extract the
   # prototype of the functions in the .ino files (and adds them at the beginning of the C++ file), so that the
   # functions can be called before they are declared.
+  # TODO: if the correct null output is needed again, move this line to System.pm
   # my $null = get_os_name() eq 'windows' ? 'nul' : '/dev/null';
   return;
 }
@@ -233,10 +234,10 @@ sub compute_binary_size {
     }
     my $max_data_size = $this->{config}->get('upload.maximum_data_size', default => undef);
     if ($max_data_size) {
-      info '  Global varables use %d bytes (%d%%) of dynamic memory, leaving %d bytes for local variables. Maximum is %d bytes.', $data_size, ($data_size * 100 / $max_data_size), ($max_data_size - $data_size), $max_data_size;
+      info '  Global variables use %d bytes (%d%%) of dynamic memory, leaving %d bytes for local variables. Maximum is %d bytes.', $data_size, ($data_size * 100 / $max_data_size), ($max_data_size - $data_size), $max_data_size;
       fatal 'Too much memory used' if $data_size > $max_data_size;
     } else {
-      info '  Global varables use %d bytes of dynamic memory.', $data_size;
+      info '  Global variables use %d bytes of dynamic memory.', $data_size;
     }
   }
 
