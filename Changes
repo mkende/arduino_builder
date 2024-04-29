@@ -7,6 +7,7 @@ Revision history for Perl distribution App-ArduinoBuilder
  - Improve the logging, convert it to using Log::Log4perl through Log::Any
  - Replace the custom CommandRunner with Parallel::TaskExecutor (the same code
    forked to a new separate distribution).
+ - Fix a bug with an inverted logic when recursing in the src directories.
 
 0.07 - 2023-06-05
 

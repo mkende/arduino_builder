@@ -332,7 +332,7 @@ sub build {
     $builder->run_hook('core.prebuild');
     my $built_core = $builder->build_archive([$config->get('build.core.path'), $config->get('build.variant.path')], catdir($config->get('build.path'), 'core'), 'core.a', $force->('core'));
     info ($built_core ? '  Success' : '  Already up-to-date');
-    $built_something |= $built_core;
+    $built_something ||= $built_core;
     $builder->run_hook('core.postbuild');
   }
 
@@ -396,7 +396,7 @@ sub build {
     # build only the code inside the src/ directory
     my $built_sketch = $builder->build_object_files(
         $config->get('builder.source.path'), catdir($config->get('build.path'), 'sketch'),
-        [], $force->('sketch'), $config->get('builder.source.is_recursive'));
+        [], $force->('sketch'), !$config->get('builder.source.is_recursive'));
     info ($built_sketch ? '  Success' : '  Already up-to-date');
     $built_something |= $built_sketch;
     $builder->run_hook('sketch.postbuild');
