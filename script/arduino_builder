@@ -5,6 +5,10 @@ use strict;
 use warnings;
 use utf8;
 
+# This is used when using our custom cpanm command line, that ensure that the
+# dependencies can be found even after a perl upgrade.
+use lib '/usr/local/lib/perl5';
+
 use open ':std', ':encoding(UTF-8)';
 
 use App::ArduinoBuilder;
