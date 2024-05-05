@@ -51,8 +51,7 @@ sub monitor {
   # The protocol is described at:
   # https://arduino.github.io/arduino-cli/0.32/pluggable-monitor-specification
 
-  my $tool = App::ArduinoBuilder::JsonTool->new(
-    $cmd, catch_error => 1);
+  my $tool = App::ArduinoBuilder::JsonTool->new($cmd);
   $tool->send("HELLO 1 ${App::ArduinoBuilder::TOOLS_USER_AGENT}\n");
 
   # TODO: we should have a way to check whether we are at least logging DEBUG

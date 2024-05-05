@@ -30,6 +30,7 @@ on 'develop' => sub {
 
 requires 'Parallel::TaskExecutor';
 requires 'Data::Section::Simple';
+requires 'IPC::Run';
 requires 'Log::Log4perl';
 requires 'Log::Any';
 requires 'Log::Any::Simple';

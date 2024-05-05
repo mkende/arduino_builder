@@ -8,6 +8,7 @@ Revision history for Perl distribution App-ArduinoBuilder
  - Replace the custom CommandRunner with Parallel::TaskExecutor (the same code
    forked to a new separate distribution).
  - Fix a bug with an inverted logic when recursing in the src directories.
+ - Use IPC::Run for the JsonTool module.
 
 0.07 - 2023-06-05
 

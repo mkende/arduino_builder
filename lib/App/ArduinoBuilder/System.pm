@@ -11,7 +11,7 @@ use List::Util 'first';
 use Log::Any::Simple ':default';
 use Win32::ShellQuote 'quote_native';
 
-our @EXPORT_OK = qw(find_arduino_dir system_cwd system_canonpath execute_cmd);
+our @EXPORT_OK = qw(find_arduino_dir system_cwd system_canonpath execute_cmd split_cmd);
 
 sub find_arduino_dir {
   my @tests;
@@ -53,32 +53,39 @@ sub system_canonpath {
   return $canon;
 }
 
+# Splits a given command line string into individual arguments.
+# Returns the array of individual arguments.
+#
+# This approach is very primitive. However both Parse::CommandLine and
+# Text::ParseWords have the same issue that they consider that a backslash can
+# escape any character, which is wrong on Windows (C:\foo is not C:foo).
+# Also Text::Balanced, is not well suited for this case where we can have
+# unquoted pieces of text.
+#
+# Ideally, we would use whatever Perl uses to split a command into word as
+# per https://perldoc.perl.org/functions/exec, but this does not seem to be
+# exposed
+#
+# TODO: support escaped quotes (that are not quoting arguments) as well as,
+# maybe, quotes interrupting unquoted arguments.
+sub split_cmd {
+  my ($cmd) = @_;
+  my @cmd;
+  while ($cmd =~ m/ \G \s* (?: (['"])(?<p>.*?)\1 | (?<p>[^ ]+) ) /gx) {
+    push @cmd, $+{p};
+  }
+  return @cmd;
+}
+
 sub execute_cmd {
   my ($cmd, %options) = @_;
   trace $cmd;
   if ($^O eq 'MSWin32') {
     # This fix cases where the command looks like: foo '--bar="baz"'
     #
-    # This approach is very primitive. However both Parse::CommandLine and
-    # Text::ParseWords have the same issue that they consider that a backslash
-    # can escape any character, which is wrong on Windows (C:\foo is not C:foo).
-    # Also Text::Balanced, is not well suited for this case where we can have
-    # unquoted pieces of text.
-    #
-    # Ideally, we would use whatever Perl uses to split a command into word as
-    # per https://perldoc.perl.org/functions/exec, but this does not seem to be
-    # exposed
-    #
-    # TODO: support escaped quotes (that are not quoting arguments) as well as,
-    # maybe, quotes interrupting unquoted arguments.
-    my @cmd;
-    while ($cmd =~ m/ \G \s* (?: (['"])(?<p>.*?)\1 | (?<p>[^ ]+) ) /gx) {
-      push @cmd, $+{p};
-    }
-
-    # TODO: Possibly we could just split the command using parse_command_line
+    # TODO: Possibly we could just split the command using split_cmd
     # and then pass the list to system (and find something for the `` case).
-    $cmd = quote_native(@cmd);
+    $cmd = quote_native(split_cmd($cmd));
   }
   if (exists $options{capture_output}) {
     my $out = `${cmd}`;
