@@ -35,7 +35,3 @@ requires 'Log::Any';
 requires 'Log::Any::Simple';
 requires 'Log::Any::Adapter::Log4perl';
 requires 'Win32::ShellQuote';
-
-on 'test' => sub {
-  requires 'Log::Log4perl::CommandLine';
-};

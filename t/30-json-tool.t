@@ -2,7 +2,6 @@ use strict;
 use warnings;
 use utf8;
 
-use Log::Log4perl::CommandLine ':all';
 use Test2::V0;
 use Test2::IPC;
 
