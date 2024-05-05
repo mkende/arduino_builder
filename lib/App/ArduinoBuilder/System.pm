@@ -60,17 +60,17 @@ sub execute_cmd {
     # This fix cases where the command looks like: foo '--bar="baz"'
     #
     # This approach is very primitive. However both Parse::CommandLine and
-    # Text::ParseWords have the same issue that the consider that a backslash
+    # Text::ParseWords have the same issue that they consider that a backslash
     # can escape any character, which is wrong on Windows (C:\foo is not C:foo).
     # Also Text::Balanced, is not well suited for this case where we can have
-    # unquoted piecese of text.
+    # unquoted pieces of text.
     #
-    # Ideally, we would usewhatever Perl uses to split a command into word as
+    # Ideally, we would use whatever Perl uses to split a command into word as
     # per https://perldoc.perl.org/functions/exec, but this does not seem to be
     # exposed
     #
     # TODO: support escaped quotes (that are not quoting arguments) as well as,
-    # maybe, quotes interrupting unquoted arguments.    
+    # maybe, quotes interrupting unquoted arguments.
     my @cmd;
     while ($cmd =~ m/ \G \s* (?: (['"])(?<p>.*?)\1 | (?<p>[^ ]+) ) /gx) {
       push @cmd, $+{p};
