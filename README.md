@@ -32,7 +32,7 @@ Then, on Linux systems, run the following command:
 sudo cpanm App::ArduinoBuilder -n -L /usr/local --man-pages --install-args 'DESTINSTALLBIN=/usr/local/bin'
 ```
 
-On Windows system, use::
+On Windows system, use:
 
 ```shell
 cpanm App::ArduinoBuilder -n

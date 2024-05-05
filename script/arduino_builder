@@ -29,7 +29,7 @@ __DATA__
 
 =head1 NAME
 
-arduino_builder - Build system for Arduino programs
+arduino_builder - All-in-one build system for Arduino programs
 
 =head1 SYNOPSIS
 

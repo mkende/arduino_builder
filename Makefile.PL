@@ -13,7 +13,7 @@ WriteMakefile(
     DISTNAME         => 'App-ArduinoBuilder',
     AUTHOR           => q{Mathias Kende <mathias@cpan.org>},
     VERSION_FROM     => 'lib/App/ArduinoBuilder.pm',
-    ABSTRACT         => q{Build system for Arduino programs},
+    ABSTRACT         => q{All-in-one build system for Arduino programs},
     LICENSE          => 'mit',
     EXE_FILES        => ['script/arduino_builder',],
     MIN_PERL_VERSION => '5.026',
