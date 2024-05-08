@@ -31,8 +31,9 @@ sub monitor {
       my $tool_dir = $config->get($tool_key);
       $cmd = catfile($tool_dir, $tool);
       $cmd .= '.exe' if $^O eq 'MSWin32';
+      debug 'Using monitor tool required for protocol %s: %s (%s)', $protocol, $tool, $cmd;
     } else {
-      error "Invalid pluggable discovery reference format: $tooldef";
+      fatal "Invalid pluggable discovery reference format: $tooldef";
     }
   } elsif ($config->exists("pluggable_monitor.pattern.${protocol}")) {
     $cmd = $config->get("pluggable_monitor.pattern.${protocol}");

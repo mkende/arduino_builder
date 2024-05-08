@@ -111,8 +111,10 @@ sub generate_project_config {
     $project_dir_is_cwd = 1;
     $project_dir = system_cwd();
     $config->set('builder.project_dir' => $project_dir);
+    debug 'Using the current directory as the project dir: %s', $project_dir;
   } else {
     $project_dir = $config->get('builder.project_dir');
+    debug 'Using the specified project dir: %s', $project_dir;
   }
 
   $config->read_file(catfile($project_dir, 'arduino_builder.local'), allow_missing => 1);
@@ -123,12 +125,16 @@ sub generate_project_config {
     if ($config->exists('builder.default_build_dir')) {
       $build_dir = $config->get('builder.default_build_dir');
       $config->set('builder.internal.build_dir_from_default' => 1);
+      debug 'Using the default build dir: %s', $build_dir;
     } elsif (!$project_dir_is_cwd) {
       $build_dir = system_cwd();
+      debug 'Using the current directory as the build dir: %s', $build_dir;
     } else {
       fatal 'No builder.default_build_dir config and --build_dir was not passed when building from the project directory.';
     }
     $config->set('builder.internal.build_dir' => $build_dir);
+  } else {
+    debug 'Using the explicitly specified build dir: %s', $config->get('builder.internal.build_dir')
   }
   $config->set('build.path' => $config->get('builder.internal.build_dir'));
 
@@ -137,19 +143,24 @@ sub generate_project_config {
     if (defined $d) {
       $config->set('builder.source.path' => catdir($project_dir, $d));
       $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+      debug 'Using the following directory as the source dir (recursively): %s', $d;
     } else {
       $config->set('builder.source.path' => $project_dir);
       $config->set('builder.source.is_recursive' => 0, ignore_existing => 1);
+      debug 'Using the project dir (non-recursively) as the source dir.';
     }
   } else {
     $config->set('builder.source.is_recursive' => 1, ignore_existing => 1);
+    debug 'Using an explicitly specified source dir (%s): %s', ($config->get('builder.source.is_recursive') ? 'recursively' : 'non-recursively'), $config->get('builder.source.path');
   }
 
   my $arduino_dir;
   if ($config->exists('builder.arduino.install_dir')) {
     $arduino_dir = $config->get('builder.arduino.install_dir');
+    debug 'Using the explicitly specified arduino directory: %s', $arduino_dir;
   } else {
     $arduino_dir = find_arduino_dir();
+    debug 'Using the discovered arduino directory: %s', $arduino_dir;
   }
 
   if (!$config->exists('builder.package.path')) {
@@ -157,12 +168,11 @@ sub generate_project_config {
     # TODO: the core package can also be installed in a "hardware" directory in
     # the sketch directory. We should search for it there.
     fatal "The builder.package.path config is not set and Arduino installation directory not found" unless $arduino_dir;
-    debug "Using arduino directory: ${arduino_dir}";
     my $package_name = $config->get('builder.package.name');
     my @tests = (catdir($arduino_dir, 'packages', $package_name), catdir($arduino_dir, 'hardware', $package_name));
     my @dirs = grep { -d } @tests;
     fatal "Cannot find the package directory for '${package_name}' inside Arduino directory: ${arduino_dir}" unless @dirs;
-    debug "Using package directory: ${dirs[0]}";
+    debug 'Using package directory found from its name (%s): %s', $package_name, $dirs[0];
     $config->set('builder.package.path' => $dirs[0]);
   } else {
     if ($config->exists('builder.package.name')) {
@@ -170,6 +180,7 @@ sub generate_project_config {
     } else {
       $config->set('builder.package.name' => basename($config->get('builder.package.path')));
     }
+    debug 'Using the explicitly specified package directory: %s', $config->get('builder.package.path');
   }
 
   my $package_path = $config->get('builder.package.path');
@@ -185,7 +196,7 @@ sub generate_project_config {
       fatal 'The builder.package.arch config is not set and more than one arch is present in the package: '.$hardware_dir;
     }
   }
-  debug "Project config: \n%s", sub { $config->dump('  ') };
+  debug "Project config:\n%s", sub { $config->dump('  ') };
 
   my $hardware_path = find_latest_revision_dir(catdir($hardware_dir, $config->get('builder.package.arch')));
 
@@ -250,11 +261,11 @@ sub generate_project_config {
     warning 'The Arduino GUI directory could not be found, we won’t use the builtin tools.';
   }
 
+  my @all_tools;
   for my $tools_dir (@tools_dirs) {
     next unless -d $tools_dir;
     my @tools = list_sub_directories($tools_dir);
     for my $t (@tools) {
-      debug "Found tool: $t";
       my $tool_path = catdir($tools_dir, $t);
       my $latest_tool_path = find_latest_revision_dir($tool_path);
       # That one could point to the latest version found across all packages
@@ -264,7 +275,9 @@ sub generate_project_config {
         $config->set("runtime.tools.${t}-${v}.path", catdir($tool_path, $v), ignore_existing => 1);
       }
     }
+    push @all_tools, splice @tools;
   }
+  debug "Found tools: %s", [sort @all_tools];
 
   my $config_append = $config->filter('builder.config.append');
   for my $k ($config_append->keys()) {
@@ -287,6 +300,8 @@ sub generate_project_config {
 
 sub clean {
   my ($config) = @_;
+
+  info 'Cleaning the build directory...';
 
   # TODO: add a way to clean only parts of the projects.
   my $build_dir = $config->get('builder.internal.build_dir');
@@ -445,10 +460,16 @@ sub build {
 sub discover {
   my ($config) = @_;
 
-  info 'Running board discovery. Be sure to run with "-l debug" to see the result...';
+  info 'Running board discovery...';
   my @ports = App::ArduinoBuilder::Discovery::discover($config);
-  $config->set('builder.internal.ports' => \@ports);
-  info 'Success!';
+  # Discovery can be run more than once, as the port of a board can be changed
+  # after upload. So we override any previous discovered ports.
+  $config->set('builder.internal.ports' => \@ports, allow_override =>1);
+  if (@ports) {
+    info 'Found port%s: %s', (@ports > 1 ? 's' : ''), join(', ', map { $_->get('upload.port.label') } @ports);
+  } else {
+    warning 'No port found.';
+  }
 }
 
 sub select_port {
@@ -456,7 +477,10 @@ sub select_port {
 
   {
     my $port = $config->get('builder.internal.selected_port', default => undef);
-    return $port if defined $port;
+    if (defined $port) {
+      debug 'Using previously selected port: %s', $port->get('upload.port.label');
+      return $port;
+    }
   }
 
   my @ports = @{$config->get('builder.internal.ports')};
@@ -465,11 +489,9 @@ sub select_port {
   my @targets = map { fc } split(/\s*,\s*/, $config->get('builder.upload.port'));
   my $port = first { my $port = $_; any { $port->get('upload.port.lc_label') eq $_ || $port->get('upload.port.lc_address') eq $_ } @targets } @ports;
   unless (defined $port) {
-    error "None of the found ports match the specified ones";
-    error "Found the following ports: %s", join(', ', map { $_->get('upload.port.label') } @ports);
-    error "Specified ports: %s", join(', ', @targets);
     fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets);
   }
+  debug 'Using the first match port from the configuration: %s', $port->get('upload.port.address');
 
   $config->set('builder.internal.selected_port' => $port);
   return $port;

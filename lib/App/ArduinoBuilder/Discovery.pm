@@ -38,7 +38,7 @@ sub _run_one_discovery {
 
   fatal "Invalid pluggable discovery data (eventType ne 'list') for ${toolname}: %s", $res unless $res->{eventType} eq 'list';
   fatal "Pluggable discovery returned an error for ${toolname}: %s", $res if $res->{error} && $res->{error} eq 'true';
-  debug "Pluggable discovery for ${toolname} found:\n%s", $res->{ports};
+  debug "Pluggable discovery for ${toolname} found: %s", $res->{ports};
   return @{$res->{ports}};
 }
 
