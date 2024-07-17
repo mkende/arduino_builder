@@ -87,12 +87,20 @@ sub execute_cmd {
     # and then pass the list to system (and find something for the `` case).
     $cmd = quote_native(split_cmd($cmd));
   }
+  my $failed;
   if (exists $options{capture_output}) {
     my $out = `${cmd}`;
-    fatal "Can’t execute the following command: $!\n\t${cmd}" unless defined $out;
-    ${$options{capture_output}} = $out;
+    if (defined $out) {
+      ${$options{capture_output}} = $out;
+    } else {
+      $failed = 1;
+    }
   } else {
-    system($cmd) and fatal "Can’t execute the following command: $!\n\t${cmd}";
+    $failed = system($cmd);
+  }
+  if ($failed) {
+    debug "Can’t execute the following command: $!\n\t${cmd}";
+    fatal "External command failed";
   }
   return 1;
 }

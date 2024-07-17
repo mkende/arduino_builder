@@ -33,6 +33,6 @@ requires 'Data::Section::Simple';
 requires 'IPC::Run';
 requires 'Log::Log4perl';
 requires 'Log::Any';
-requires 'Log::Any::Simple';
+requires 'Log::Any::Simple', '0.05';
 requires 'Log::Any::Adapter::Log4perl';
 requires 'Win32::ShellQuote';
