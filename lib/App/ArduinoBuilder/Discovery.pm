@@ -1,5 +1,6 @@
 package App::ArduinoBuilder::Discovery;
 
+use 5.026;
 use strict;
 use warnings;
 use utf8;
@@ -7,6 +8,7 @@ use utf8;
 use App::ArduinoBuilder::Config;
 use App::ArduinoBuilder::JsonTool;
 use File::Spec::Functions;
+use List::Util 'all', 'max';
 use Log::Any::Simple ':default';
 use Time::HiRes 'usleep';
 
@@ -85,6 +87,8 @@ sub discover {
   # references. For now, we just assume that there is a tool with that discovery
   # name (we ignore the vendor ID) and we expect a binary of the same name in
   # the tool directory (this is the format used by the builtin tools).
+  # In general, that syntax could be used to automaticaly download the required
+  # tools if they are not already present.
 
   my @discovered_ports;
   for my $k ($discovery_config->keys()) {
@@ -110,6 +114,49 @@ sub discover {
       error "Invalid pluggable discovery key: %s => %s", $k, $discovery_config->get($k);
     }
   }
+
+  return () unless @discovered_ports;
+
+  # Something that we don’t implement is that the discovery could be used to
+  # automatically detect the board being used, as well as some of its "menu"
+  # properties.
+  # However, the whole thing is very buggy. For example the Feather 2040 board
+  # will have a match on the vid property but not the pid property, so we accept
+  # partial match (theoretically we should accept full matches).
+
+  # Some boards have the upload ports properties defined without the
+  # upload_ports prefix (in addition to also having them with the prefix), we
+  # are ignoring that.
+  my $defined_ports = $config->filter('upload_port');
+  my @property_sets_keys = $defined_ports->top_level_keys();
+  my @property_sets;
+  if (all { m/^\d+$/ } @property_sets_keys) {
+    @property_sets = map { { $defined_ports->filter($_)->get_hash() } } @property_sets_keys;
+  } else {
+    @property_sets = { $defined_ports->get_hash() };
+  }
+  
+  # We compute a "match strength" for all discovered ports, corresponding to how
+  # many properties (from a single defined set) the port matches.
+  my $all_max_match = 0;
+  for my $p (@discovered_ports) {
+    my $max_match = 0;
+    for my $s (@property_sets) {
+      my $match = 0;
+      while (my ($k, $v) = each %{$s}) {
+        if (fc($p->{properties}{$k} // '') eq fc($v)) {
+          $match++;
+        }
+      }
+      $max_match = max($max_match, $match);
+    }
+    $all_max_match = max($all_max_match, $max_match);
+    $p->{upload_port_match_strength} = $max_match;
+    trace "Port %s: match strength == %d", $p->{label}, $max_match;
+  }
+
+  # Now, we keep all the found ports that have the highest 
+  @discovered_ports = grep { $_->{upload_port_match_strength} == $all_max_match } @discovered_ports;
 
   return map { _port_to_config($config, $_) } @discovered_ports;
 }
