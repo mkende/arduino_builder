@@ -8,6 +8,7 @@ use App::ArduinoBuilder::Config;
 use App::ArduinoBuilder::JsonTool;
 use File::Spec::Functions;
 use Log::Any::Simple ':default';
+use Time::HiRes 'usleep';
 
 
 sub _test_command_response {
@@ -33,7 +34,14 @@ sub _run_one_discovery {
   # But, as there are no other versions for know, it’s somehow an overkill.
   _fail_invalid_response($tool->send("HELLO 1 ${App::ArduinoBuilder::TOOLS_USER_AGENT}\n"), 'hello', $toolname);
   _fail_invalid_response($tool->send("START\n"), 'start', $toolname);
+  # A small delay here, otherwise the LIST command returns empty results :(
+  usleep(50000);
   my $res = $tool->send("LIST\n");
+  if (!@{$res->{ports}}) {
+    # mitigation: if the list was empty initially, let’s try again, maybe the tool has initialized now.
+    trace "Retrying due to empty list";
+    $res = $tool->send("LIST\n");
+  }
   _fail_invalid_response($tool->send("QUIT\n"), 'quit', $toolname);
 
   fatal "Invalid pluggable discovery data (eventType ne 'list') for ${toolname}: %s", $res unless $res->{eventType} eq 'list';
