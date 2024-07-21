@@ -1,6 +1,6 @@
 Revision history for Perl distribution App-ArduinoBuilder
 
-0.08 - ??
+0.08 - 2024-07-21
 
  - Implement a workaround to convert command lines to using Windows escaping
    when needed.

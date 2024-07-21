@@ -16,7 +16,7 @@ use File::Basename;
 use File::Path 'remove_tree';
 use File::Spec::Functions;
 use Getopt::Long;
-use List::Util 'any', 'none', 'first', 'all';
+use List::Util 'any', 'none', 'first';
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Log::Any::Adapter;
@@ -24,7 +24,7 @@ use Log::Any::Simple ':default';
 use Parallel::TaskExecutor 'default_executor';
 use Pod::Usage;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 # User agent used for the pluggable discovery and pluggable monitor tools.
 our $TOOLS_USER_AGENT = "\"App::ArduinoBuilder ${VERSION}\"";
@@ -506,12 +506,12 @@ sub select_port {
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
   my @targets = map { qr/^$_$/i } split(/\s*,\s*/, $config->get('builder.upload.port'));
-  my @ports = all { my $port = $_; any { $port->get('upload.port.lc_label') =~ m/$_/ || $port->get('upload.port.lc_address') =~ m/$_/ } @targets } @ports;
+  @ports = grep { my $port = $_; any { $port->get('upload.port.lc_label') =~ m/$_/ || $port->get('upload.port.lc_address') =~ m/$_/ } @targets } @ports;
   unless (@ports) {
     fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets);
   }
   warn "More than one found port match with builder.upload.port. Picking the firt one." if @ports > 1;
-  my $port = @ports[0];
+  my $port = $ports[0];
   info 'Using the first match port from the configuration: %s', $port->get('upload.port.address');
 
   $config->set('builder.internal.selected_port' => $port);
