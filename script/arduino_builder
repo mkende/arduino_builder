@@ -226,6 +226,9 @@ which ports are found by the command.
 You can also use a comma separated list for this configuration value in case
 your board can appear under different ports.
 
+The values passed in this list are treated as regex, so you can specify things
+like C<com\d+> to match any COM ports (on Windows).
+
 =item C<builder.project_dir>
 
 The path to the root directory of the project (typically the directory that

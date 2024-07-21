@@ -505,8 +505,8 @@ sub select_port {
   my @ports = @{$config->get('builder.internal.ports')};
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
-  my @targets = map { fc } split(/\s*,\s*/, $config->get('builder.upload.port'));
-  my $port = first { my $port = $_; any { $port->get('upload.port.lc_label') eq $_ || $port->get('upload.port.lc_address') eq $_ } @targets } @ports;
+  my @targets = map { qr/^$_$/i } split(/\s*,\s*/, $config->get('builder.upload.port'));
+  my $port = first { my $port = $_; any { $port->get('upload.port.lc_label') =~ m/$_/ || $port->get('upload.port.lc_address') =~ m/$_/ } @targets } @ports;
   unless (defined $port) {
     fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets);
   }
