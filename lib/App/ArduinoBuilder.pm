@@ -87,13 +87,15 @@ sub Run {
 
   push @ARGV, 'build' unless @ARGV;
 
+  trace "Executing the following command: %s", sub { join(', ', @ARGV) };
+
   if (grep { /^clean$/ } @ARGV) {
     clean($config);
   }
   if (grep { /^build$/ } @ARGV) {
     build($config, \@skip, \@force, \@only);
   }
-  if (grep { /^discover$/ } @ARGV && ! grep { /^(upload|monitor)$/ } @ARGV) {
+  if (grep { /^discover$/ } @ARGV and not grep { /^(upload|monitor)$/ } @ARGV) {
     discover($config);
   }
   if (grep { /^upload$/ } @ARGV) {
