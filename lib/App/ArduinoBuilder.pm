@@ -16,7 +16,7 @@ use File::Basename;
 use File::Path 'remove_tree';
 use File::Spec::Functions;
 use Getopt::Long;
-use List::Util 'any', 'none', 'first';
+use List::Util 'any', 'none', 'first', 'all';
 use Log::Log4perl;
 use Log::Log4perl::Level;
 use Log::Any::Adapter;
@@ -479,7 +479,7 @@ sub discover {
   # after upload. So we override any previous discovered ports.
   $config->set('builder.internal.ports' => \@ports, allow_override =>1);
   if (@ports) {
-    info 'Found port%s: %s', (@ports > 1 ? 's' : ''), join(', ', map { $_->get('upload.port.label') } @ports);
+    debug 'Found port%s: %s', (@ports > 1 ? 's' : ''), join(', ', map { $_->get('upload.port.label') } @ports);
   } else {
     warning 'No port found.';
   }
@@ -506,11 +506,13 @@ sub select_port {
   # TODO: implement an exact match selection and an interactive selection.
   fatal "You must pass the --target-port option to select the upload target" unless $config->exists('builder.upload.port');
   my @targets = map { qr/^$_$/i } split(/\s*,\s*/, $config->get('builder.upload.port'));
-  my $port = first { my $port = $_; any { $port->get('upload.port.lc_label') =~ m/$_/ || $port->get('upload.port.lc_address') =~ m/$_/ } @targets } @ports;
-  unless (defined $port) {
+  my @ports = all { my $port = $_; any { $port->get('upload.port.lc_label') =~ m/$_/ || $port->get('upload.port.lc_address') =~ m/$_/ } @targets } @ports;
+  unless (@ports) {
     fatal "None of the specified ports (%s) can be found, can your target be found by the 'discover' command?", join(', ', @targets);
   }
-  debug 'Using the first match port from the configuration: %s', $port->get('upload.port.address');
+  warn "More than one found port match with builder.upload.port. Picking the firt one." if @ports > 1;
+  my $port = @ports[0];
+  info 'Using the first match port from the configuration: %s', $port->get('upload.port.address');
 
   $config->set('builder.internal.selected_port' => $port);
   return $port;
