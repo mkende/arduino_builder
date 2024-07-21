@@ -11,6 +11,7 @@ Revision history for Perl distribution App-ArduinoBuilder
  - Use IPC::Run for the JsonTool module.
  - Reduce the default verbosity of the output by not logging entire command
    lines on failures.
+ - Add a way to force a port for the system, even if the discovery fails.
 
 0.07 - 2023-06-05
 

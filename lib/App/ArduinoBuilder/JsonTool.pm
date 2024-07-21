@@ -28,6 +28,7 @@ sub new {
 
   $this->{tool} = start [split_cmd($cmd)], \$this->{out}, \$this->{in}, ($this->{timer} = timeout('inf'));
   $this->{timer}->exception(\$timeout_exn);
+  trace "Creating tool for command: ${cmd}";
 
   return $this;
 }

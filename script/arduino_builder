@@ -112,6 +112,8 @@ This is usually, but not necessarily, done through a serial port.
 
 =item C<--target-port I<port>>, C<--port>
 
+=item C<--force-port I<protocol:port>>
+
 =back
 
 =head1 CONFIGURATION FILE SYNTAX

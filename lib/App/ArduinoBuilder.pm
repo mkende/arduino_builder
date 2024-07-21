@@ -71,6 +71,12 @@ sub Run {
       'stack-trace-on-error|stack' => sub { Log::Any::Simple::die_with_stack_trace('long') },
       'parallelize|j=i' => sub { $config->set('builder.parallelize' => $_[1], allow_override => 1) },
       'target-port|port=s' => sub { $config->append('builder.upload.port' => $_[1], ',')},
+      'force-port=s' => sub {
+        my ($protocol, $address) = split(/:/, $_[1]);
+        $config->set('builder.forced_port.protocol' => $protocol);
+        $config->set('builder.forced_port.address' => $address);
+        $config->set('builder.forced_port.forced' => 1);
+      },
     ) or pod2usage(-exitval => 2, -verbose =>0);
 
   if (my @unknown = grep { !/^(clean|build|discover|upload|monitor)$/ } @ARGV) {
@@ -460,6 +466,11 @@ sub build {
 sub discover {
   my ($config) = @_;
 
+  if ($config->get('builder.forced_port.forced', default => 0)) {
+    info 'Skipping board discovery';
+    return;
+  }
+
   info 'Running board discovery...';
   my @ports = App::ArduinoBuilder::Discovery::discover($config);
   # Discovery can be run more than once, as the port of a board can be changed
@@ -474,6 +485,12 @@ sub discover {
 
 sub select_port {
   my ($config) = @_;
+
+  if ($config->get('builder.forced_port.forced', default => 0)) {
+    # A forced port does not match a found port (as there are none), so we can’t
+    # just set selected_port here.
+    return $config->filter('builder.forced_port')->prefix('upload.port');
+  }
 
   {
     my $port = $config->get('builder.internal.selected_port', default => undef);
