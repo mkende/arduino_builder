@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use utf8;
 
-use App::ArduinoBuilder::Builder 'build_archive', 'build_object_files', 'link_executable', 'run_hook';
+use App::ArduinoBuilder::Builder;
 use App::ArduinoBuilder::Config 'get_os_name';
 use App::ArduinoBuilder::Discovery;
 use App::ArduinoBuilder::FilePath 'find_latest_revision_dir', 'list_sub_directories', 'find_all_files_with_extensions';
